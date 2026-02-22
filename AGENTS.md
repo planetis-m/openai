@@ -20,7 +20,7 @@
   - `nim c -r tests/test_openai.nim`
   - `nim c -r tests/test_openai_retry.nim`
 - Build examples:
-  - `nim c test_live_ocr.nim`
+  - `nim c examples/live_ocr_retry.nim`
   - `nim c examples/live_batch_chat_polling.nim`
 
 ## Coding Style & Naming

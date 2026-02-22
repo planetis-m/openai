@@ -19,12 +19,26 @@ proc summarizeText(text: string; maxLen = 80): string =
   else:
     result = oneLine
 
+proc buildParams(prompt: string): ChatCreateParams =
+  chatCreate(
+    model = ModelName,
+    messages = [userMessageText(prompt)],
+    temperature = 0.0,
+    maxTokens = 48,
+    toolChoice = ToolChoice.none,
+    responseFormat = formatText
+  )
+
+proc printCompletion(item: RequestResult) =
+  var parsed: ChatCreateResult
+  discard chatParse(item.response.body, parsed)
+  echo "completed id=", item.response.request.requestId,
+    " status=", item.response.code,
+    " error=", item.error.kind,
+    " text=\"", summarizeText(firstText(parsed)), "\""
+
 proc main() =
   let apiKey = getEnv("DEEPINFRA_API_KEY")
-  if apiKey.len == 0:
-    raise newException(IOError,
-      "DEEPINFRA_API_KEY is required. Export it (for example: set -a; source .env; set +a).")
-
   let endpoint = OpenAIConfig(
     url: ApiUrl,
     apiKey: apiKey
@@ -50,14 +64,7 @@ proc main() =
       var added = 0
       while added < RequestsPerBatch and submitted < TotalRequests:
         let prompt = prompts[submitted mod prompts.len]
-        let params = chatCreate(
-          model = ModelName,
-          messages = [userMessageText(prompt)],
-          temperature = 0.0,
-          maxTokens = 48,
-          toolChoice = ToolChoice.none,
-          responseFormat = formatText
-        )
+        let params = buildParams(prompt)
 
         chatAdd(
           batch = batch,
@@ -77,23 +84,7 @@ proc main() =
     var item: RequestResult
     if client.pollForResult(item):
       inc completed
-      let reqId = item.response.request.requestId
-
-      if item.error.kind != teNone:
-        echo "completed id=", reqId, " transportError=", item.error.kind
-      else:
-        if isHttpSuccess(item.response.code):
-          var parsed: ChatCreateResult
-          if chatParse(item.response.body, parsed):
-            echo "completed id=", reqId,
-              " status=", item.response.code,
-              " text=\"", summarizeText(firstText(parsed)), "\""
-          else:
-            echo "completed id=", reqId,
-              " status=", item.response.code,
-              " parseError=true"
-        else:
-          echo "completed id=", reqId, " status=", item.response.code
+      printCompletion(item)
     else:
       sleep(10)
 

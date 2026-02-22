@@ -201,41 +201,38 @@ proc finish*(x: ChatCreateResult; i = 0): string =
 
 proc firstText*(x: ChatCreateResult; i = 0): string =
   result = ""
-  if not x.hasChoiceAt(i):
-    return
-  let content = x.choices[i].message.content
-  case content.kind
-  of ChatCompletionAssistantContentKind.text:
-    result = content.text
-  of ChatCompletionAssistantContentKind.parts:
-    for part in content.parts:
-      if part.text.len > 0:
-        return part.text
+  if x.hasChoiceAt(i):
+    let content = x.choices[i].message.content
+    case content.kind
+    of ChatCompletionAssistantContentKind.text:
+      result = content.text
+    of ChatCompletionAssistantContentKind.parts:
+      for part in content.parts:
+        if result.len == 0 and part.text.len > 0:
+          result = part.text
 
 proc allTextParts*(x: ChatCreateResult; i = 0): seq[string] =
   result = @[]
-  if not x.hasChoiceAt(i):
-    return
-  let content = x.choices[i].message.content
-  if content.kind != ChatCompletionAssistantContentKind.parts:
-    return
-  for part in content.parts:
-    result.add(part.text)
+  if x.hasChoiceAt(i):
+    let content = x.choices[i].message.content
+    if content.kind == ChatCompletionAssistantContentKind.parts:
+      for part in content.parts:
+        result.add(part.text)
 
 proc calls*(x: ChatCreateResult;
     i = 0): seq[ChatCompletionMessageToolCall] =
-  if not x.hasChoiceAt(i):
-    return @[]
-  x.choices[i].message.tool_calls
+  result = @[]
+  if x.hasChoiceAt(i):
+    result = x.choices[i].message.tool_calls
 
 proc firstCallName*(x: ChatCreateResult; i = 0): string =
   let callList = x.calls(i)
-  if callList.len == 0:
-    return ""
-  callList[0].function.name
+  result = ""
+  if callList.len > 0:
+    result = callList[0].function.name
 
 proc firstCallArgs*(x: ChatCreateResult; i = 0): string =
   let callList = x.calls(i)
-  if callList.len == 0:
-    return ""
-  callList[0].function.arguments
+  result = ""
+  if callList.len > 0:
+    result = callList[0].function.arguments
