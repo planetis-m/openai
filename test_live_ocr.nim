@@ -77,7 +77,7 @@ proc main =
     temperature = 0.0,
     maxTokens = 256,
     toolChoice = ToolChoice.none,
-    responseFormat = formatText()
+    responseFormat = formatText
   )
 
   let endpoint = OpenAIConfig(

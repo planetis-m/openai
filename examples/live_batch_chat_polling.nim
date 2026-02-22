@@ -1,6 +1,6 @@
 import std/[os, strutils]
 import relay
-import ../openai
+import openai
 
 {.passL: "-lcurl".}
 
@@ -56,7 +56,7 @@ proc main() =
           temperature = 0.0,
           maxTokens = 48,
           toolChoice = ToolChoice.none,
-          responseFormat = formatText()
+          responseFormat = formatText
         )
 
         chatAdd(

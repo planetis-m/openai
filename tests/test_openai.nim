@@ -1,6 +1,6 @@
 import relay
 import jsonx
-import ../openai
+import openai
 
 const GoodResponse = """{
   "id": "cmpl_1",
@@ -62,7 +62,7 @@ proc sampleParams(streamValue = false): ChatCreateParams =
     stream = streamValue,
     temperature = 0.2,
     maxTokens = 64,
-    responseFormat = formatText(),
+    responseFormat = formatText,
     messages = [
       userMessageText("ping")
     ]
@@ -161,10 +161,10 @@ proc testInputConstructorsCoverage() =
   doAssert tool.function.name == "lookup"
   doAssert tool.function.description == "search docs"
 
-  doAssert formatText().`type` == ResponseFormatType.text
-  doAssert formatJsonObject().`type` == ResponseFormatType.json_object
-  doAssert formatJsonSchema().`type` == ResponseFormatType.json_schema
-  doAssert formatRegex().`type` == ResponseFormatType.regex
+  doAssert formatText.`type` == ResponseFormatType.text
+  doAssert formatJsonObject.`type` == ResponseFormatType.json_object
+  doAssert formatJsonSchema.`type` == ResponseFormatType.json_schema
+  doAssert formatRegex.`type` == ResponseFormatType.regex
 
 proc testChatCreateParamsBuilder() =
   let request = chatCreate(
@@ -175,7 +175,7 @@ proc testChatCreateParamsBuilder() =
     maxTokens = 321,
     tools = [toolFunction("calc", "math")],
     toolChoice = ToolChoice.required,
-    responseFormat = formatJsonObject()
+    responseFormat = formatJsonObject
   )
 
   doAssert request.model == "gpt-4.1"
@@ -201,7 +201,7 @@ proc testSerializationRoundTripForBuiltRequest() =
     ],
     maxTokens = 128,
     tools = [toolFunction("extract")],
-    responseFormat = formatText()
+    responseFormat = formatText
   )
   let serialized = toJson(request)
   let parsed = fromJson(serialized, ChatCreateParams)

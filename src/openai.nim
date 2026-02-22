@@ -96,23 +96,17 @@ proc toolFunction*(name: string; description = ""): ChatTool =
     )
   )
 
-proc formatText*(): ResponseFormat =
-  ResponseFormat(`type`: ResponseFormatType.text)
-
-proc formatJsonObject*(): ResponseFormat =
-  ResponseFormat(`type`: ResponseFormatType.json_object)
-
-proc formatJsonSchema*(): ResponseFormat =
-  ResponseFormat(`type`: ResponseFormatType.json_schema)
-
-proc formatRegex*(): ResponseFormat =
-  ResponseFormat(`type`: ResponseFormatType.regex)
+const
+  formatText* = ResponseFormat(`type`: ResponseFormatType.text)
+  formatJsonObject* = ResponseFormat(`type`: ResponseFormatType.json_object)
+  formatJsonSchema* = ResponseFormat(`type`: ResponseFormatType.json_schema)
+  formatRegex* = ResponseFormat(`type`: ResponseFormatType.regex)
 
 proc chatCreate*(model: string; messages: openArray[ChatMessage];
     stream = false; temperature = 1.0; maxTokens = 0;
     tools: openArray[ChatTool] = [];
     toolChoice = ToolChoice.auto;
-    responseFormat = formatText()): ChatCreateParams =
+    responseFormat = formatText): ChatCreateParams =
   ChatCreateParams(
     model: model,
     messages: @messages,
