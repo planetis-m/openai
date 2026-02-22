@@ -5,20 +5,20 @@ import openai_schema
 export openai_schema
 
 type
-  ResponsesCreateParams* = OpenAIChatCompletionsIn
-  ResponsesCreateResult* = OpenAIChatCompletionOut
+  ChatCreateParams* = OpenAIChatCompletionsIn
+  ChatCreateResult* = OpenAIChatCompletionOut
 
-  EndpointConfig* = object
+  OpenAIConfig* = object
     url*: string
     apiKey*: string
 
-proc textPart*(text: string): ChatCompletionContentPart =
+proc partText*(text: string): ChatCompletionContentPart =
   ChatCompletionContentPart(
     `type`: ChatCompletionContentPartType.text,
     text: text
   )
 
-proc imageUrlPart*(url: string;
+proc partImageUrl*(url: string;
     detail = ImageDetail.auto): ChatCompletionContentPart =
   ChatCompletionContentPart(
     `type`: ChatCompletionContentPartType.image_url,
@@ -28,7 +28,7 @@ proc imageUrlPart*(url: string;
     )
   )
 
-proc inputAudioPart*(data: string;
+proc partInputAudio*(data: string;
     format: InputAudioFormat): ChatCompletionContentPart =
   ChatCompletionContentPart(
     `type`: ChatCompletionContentPartType.input_audio,
@@ -38,56 +38,56 @@ proc inputAudioPart*(data: string;
     )
   )
 
-proc textContent*(text: string): ChatCompletionMessageContent =
+proc contentText*(text: string): ChatCompletionMessageContent =
   ChatCompletionMessageContent(
     kind: ChatCompletionInputContentKind.text,
     text: text
   )
 
-proc partsContent*(parts: openArray[ChatCompletionContentPart]): ChatCompletionMessageContent =
+proc contentParts*(parts: openArray[ChatCompletionContentPart]): ChatCompletionMessageContent =
   ChatCompletionMessageContent(
     kind: ChatCompletionInputContentKind.parts,
     parts: @parts
   )
 
-proc msgSystem*(text: string; name = ""): ChatMessage =
+proc systemMessageText*(text: string; name = ""): ChatMessage =
   ChatMessage(
     role: ChatMessageRole.system,
-    content: textContent(text),
+    content: contentText(text),
     name: name
   )
 
-proc msgUserText*(text: string; name = ""): ChatMessage =
+proc userMessageText*(text: string; name = ""): ChatMessage =
   ChatMessage(
     role: ChatMessageRole.user,
-    content: textContent(text),
+    content: contentText(text),
     name: name
   )
 
-proc msgUserParts*(parts: openArray[ChatCompletionContentPart];
+proc userMessageParts*(parts: openArray[ChatCompletionContentPart];
     name = ""): ChatMessage =
   ChatMessage(
     role: ChatMessageRole.user,
-    content: partsContent(parts),
+    content: contentParts(parts),
     name: name
   )
 
-proc msgAssistant*(text: string; name = ""): ChatMessage =
+proc assistantMessageText*(text: string; name = ""): ChatMessage =
   ChatMessage(
     role: ChatMessageRole.assistant,
-    content: textContent(text),
+    content: contentText(text),
     name: name
   )
 
-proc msgTool*(text: string; toolCallId: string; name = ""): ChatMessage =
+proc toolMessageText*(text: string; toolCallId: string; name = ""): ChatMessage =
   ChatMessage(
     role: ChatMessageRole.tool,
-    content: textContent(text),
+    content: contentText(text),
     name: name,
     tool_call_id: toolCallId
   )
 
-proc functionTool*(name: string; description = ""): ChatTool =
+proc toolFunction*(name: string; description = ""): ChatTool =
   ChatTool(
     `type`: ChatToolType.function,
     function: FunctionDefinition(
@@ -96,24 +96,24 @@ proc functionTool*(name: string; description = ""): ChatTool =
     )
   )
 
-proc responseFormatText*(): ResponseFormat =
+proc formatText*(): ResponseFormat =
   ResponseFormat(`type`: ResponseFormatType.text)
 
-proc responseFormatJsonObject*(): ResponseFormat =
+proc formatJsonObject*(): ResponseFormat =
   ResponseFormat(`type`: ResponseFormatType.json_object)
 
-proc responseFormatJsonSchema*(): ResponseFormat =
+proc formatJsonSchema*(): ResponseFormat =
   ResponseFormat(`type`: ResponseFormatType.json_schema)
 
-proc responseFormatRegex*(): ResponseFormat =
+proc formatRegex*(): ResponseFormat =
   ResponseFormat(`type`: ResponseFormatType.regex)
 
-proc responsesCreateParams*(model: string; messages: openArray[ChatMessage];
+proc chatCreate*(model: string; messages: openArray[ChatMessage];
     stream = false; temperature = 1.0; maxTokens = 0;
     tools: openArray[ChatTool] = [];
     toolChoice = ToolChoice.auto;
-    responseFormat = responseFormatText()): ResponsesCreateParams =
-  ResponsesCreateParams(
+    responseFormat = formatText()): ChatCreateParams =
+  ChatCreateParams(
     model: model,
     messages: @messages,
     stream: stream,
@@ -124,13 +124,13 @@ proc responsesCreateParams*(model: string; messages: openArray[ChatMessage];
     response_format: responseFormat
   )
 
-proc withDefaultHeaders(cfg: EndpointConfig;
+proc withDefaultHeaders(cfg: OpenAIConfig;
     headers: sink HttpHeaders = emptyHttpHeaders()): HttpHeaders =
   result = headers
   result["Authorization"] = "Bearer " & cfg.apiKey
   result["Content-Type"] = "application/json"
 
-proc responsesCreateRequest*(cfg: EndpointConfig; params: ResponsesCreateParams;
+proc chatRequest*(cfg: OpenAIConfig; params: ChatCreateParams;
     requestId = 0'i64; timeoutMs = 0;
     headers: sink HttpHeaders = emptyHttpHeaders()): RequestSpec =
   RequestSpec(
@@ -142,8 +142,8 @@ proc responsesCreateRequest*(cfg: EndpointConfig; params: ResponsesCreateParams;
     timeoutMs: timeoutMs
   )
 
-proc addResponsesCreate*(batch: var RequestBatch; cfg: EndpointConfig;
-    params: ResponsesCreateParams; requestId = 0'i64; timeoutMs = 0;
+proc chatAdd*(batch: var RequestBatch; cfg: OpenAIConfig;
+    params: ChatCreateParams; requestId = 0'i64; timeoutMs = 0;
     headers: sink HttpHeaders = emptyHttpHeaders()) =
   batch.addRequest(
     verb = hvPost,
@@ -154,9 +154,9 @@ proc addResponsesCreate*(batch: var RequestBatch; cfg: EndpointConfig;
     timeoutMs = timeoutMs
   )
 
-proc tryDecodeResponsesCreate*(body: string; dst: var ResponsesCreateResult): bool =
+proc chatParse*(body: string; dst: var ChatCreateResult): bool =
   try:
-    dst = fromJson(body, ResponsesCreateResult)
+    dst = fromJson(body, ChatCreateResult)
     result = true
   except CatchableError:
     result = false
@@ -178,34 +178,34 @@ proc isRetriableStatus*(code: int): bool {.inline.} =
   else:
     code >= 500 and code <= 599
 
-proc responseId*(x: ResponsesCreateResult): string {.inline.} =
+proc idOf*(x: ChatCreateResult): string {.inline.} =
   x.id
 
-proc responseModel*(x: ResponsesCreateResult): string {.inline.} =
+proc modelOf*(x: ChatCreateResult): string {.inline.} =
   x.model
 
-proc usagePromptTokens*(x: ResponsesCreateResult): int {.inline.} =
+proc promptTokens*(x: ChatCreateResult): int {.inline.} =
   x.usage.prompt_tokens
 
-proc usageCompletionTokens*(x: ResponsesCreateResult): int {.inline.} =
+proc completionTokens*(x: ChatCreateResult): int {.inline.} =
   x.usage.completion_tokens
 
-proc usageTotalTokens*(x: ResponsesCreateResult): int {.inline.} =
+proc totalTokens*(x: ChatCreateResult): int {.inline.} =
   x.usage.total_tokens
 
-proc choiceCount*(x: ResponsesCreateResult): int {.inline.} =
+proc choices*(x: ChatCreateResult): int {.inline.} =
   x.choices.len
 
-proc hasChoiceAt(x: ResponsesCreateResult; i: int): bool {.inline.} =
+proc hasChoiceAt(x: ChatCreateResult; i: int): bool {.inline.} =
   i >= 0 and i < x.choices.len
 
-proc finishReason*(x: ResponsesCreateResult; i = 0): string =
+proc finish*(x: ChatCreateResult; i = 0): string =
   if not x.hasChoiceAt(i):
     result = ""
   else:
     result = $x.choices[i].finish_reason
 
-proc assistantText*(x: ResponsesCreateResult; i = 0): string =
+proc firstText*(x: ChatCreateResult; i = 0): string =
   result = ""
   if not x.hasChoiceAt(i):
     return
@@ -218,7 +218,7 @@ proc assistantText*(x: ResponsesCreateResult; i = 0): string =
       if part.text.len > 0:
         return part.text
 
-proc assistantPartsText*(x: ResponsesCreateResult; i = 0): seq[string] =
+proc allTextParts*(x: ChatCreateResult; i = 0): seq[string] =
   result = @[]
   if not x.hasChoiceAt(i):
     return
@@ -228,20 +228,20 @@ proc assistantPartsText*(x: ResponsesCreateResult; i = 0): seq[string] =
   for part in content.parts:
     result.add(part.text)
 
-proc toolCalls*(x: ResponsesCreateResult;
+proc calls*(x: ChatCreateResult;
     i = 0): seq[ChatCompletionMessageToolCall] =
   if not x.hasChoiceAt(i):
     return @[]
   x.choices[i].message.tool_calls
 
-proc firstToolCallName*(x: ResponsesCreateResult; i = 0): string =
-  let calls = x.toolCalls(i)
-  if calls.len == 0:
+proc firstCallName*(x: ChatCreateResult; i = 0): string =
+  let callList = x.calls(i)
+  if callList.len == 0:
     return ""
-  calls[0].function.name
+  callList[0].function.name
 
-proc firstToolCallArguments*(x: ResponsesCreateResult; i = 0): string =
-  let calls = x.toolCalls(i)
-  if calls.len == 0:
+proc firstCallArgs*(x: ChatCreateResult; i = 0): string =
+  let callList = x.calls(i)
+  if callList.len == 0:
     return ""
-  calls[0].function.arguments
+  callList[0].function.arguments

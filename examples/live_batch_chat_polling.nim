@@ -25,7 +25,7 @@ proc main() =
     raise newException(IOError,
       "DEEPINFRA_API_KEY is required. Export it (for example: set -a; source .env; set +a).")
 
-  let endpoint = EndpointConfig(
+  let endpoint = OpenAIConfig(
     url: ApiUrl,
     apiKey: apiKey
   )
@@ -50,16 +50,16 @@ proc main() =
       var added = 0
       while added < RequestsPerBatch and submitted < TotalRequests:
         let prompt = prompts[submitted mod prompts.len]
-        let params = responsesCreateParams(
+        let params = chatCreate(
           model = ModelName,
-          messages = [msgUserText(prompt)],
+          messages = [userMessageText(prompt)],
           temperature = 0.0,
           maxTokens = 48,
           toolChoice = ToolChoice.none,
-          responseFormat = responseFormatText()
+          responseFormat = formatText()
         )
 
-        addResponsesCreate(
+        chatAdd(
           batch = batch,
           cfg = endpoint,
           params = params,
@@ -83,11 +83,11 @@ proc main() =
         echo "completed id=", reqId, " transportError=", item.error.kind
       else:
         if isHttpSuccess(item.response.code):
-          var parsed: ResponsesCreateResult
-          if tryDecodeResponsesCreate(item.response.body, parsed):
+          var parsed: ChatCreateResult
+          if chatParse(item.response.body, parsed):
             echo "completed id=", reqId,
               " status=", item.response.code,
-              " text=\"", summarizeText(assistantText(parsed)), "\""
+              " text=\"", summarizeText(firstText(parsed)), "\""
           else:
             echo "completed id=", reqId,
               " status=", item.response.code,

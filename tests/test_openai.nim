@@ -56,32 +56,32 @@ const PartsResponse = """{
   }
 }"""
 
-proc sampleParams(streamValue = false): ResponsesCreateParams =
-  responsesCreateParams(
+proc sampleParams(streamValue = false): ChatCreateParams =
+  chatCreate(
     model = "gpt-4.1-mini",
     stream = streamValue,
     temperature = 0.2,
     maxTokens = 64,
-    responseFormat = responseFormatText(),
+    responseFormat = formatText(),
     messages = [
-      msgUserText("ping")
+      userMessageText("ping")
     ]
   )
 
-proc sampleConfig(apiKey = "sk-test"): EndpointConfig =
-  EndpointConfig(
+proc sampleConfig(apiKey = "sk-test"): OpenAIConfig =
+  OpenAIConfig(
     url: "https://api.openai.com/v1/chat/completions",
     apiKey: apiKey
   )
 
-proc testResponsesCreateRequest() =
+proc testChatRequest() =
   let cfg = sampleConfig(apiKey = "new-token")
   var headers = emptyHttpHeaders()
   headers["Authorization"] = "Bearer old-token"
   headers["Content-Type"] = "text/plain"
   headers["X-Trace-Id"] = "trace-1"
 
-  let req = responsesCreateRequest(
+  let req = chatRequest(
     cfg,
     sampleParams(),
     requestId = 42,
@@ -97,85 +97,85 @@ proc testResponsesCreateRequest() =
   doAssert req.headers["Content-Type"] == "application/json"
   doAssert req.headers["X-Trace-Id"] == "trace-1"
 
-  let payload = fromJson(req.body, ResponsesCreateParams)
+  let payload = fromJson(req.body, ChatCreateParams)
   doAssert payload.model == "gpt-4.1-mini"
   doAssert payload.messages.len == 1
   doAssert payload.messages[0].content.kind == ChatCompletionInputContentKind.text
   doAssert payload.messages[0].content.text == "ping"
 
 proc testInputConstructorsCoverage() =
-  let pText = textPart("plain")
+  let pText = partText("plain")
   doAssert pText.`type` == ChatCompletionContentPartType.text
   doAssert pText.text == "plain"
 
-  let pImg = imageUrlPart("https://example.com/a.png", detail = ImageDetail.high)
+  let pImg = partImageUrl("https://example.com/a.png", detail = ImageDetail.high)
   doAssert pImg.`type` == ChatCompletionContentPartType.image_url
   doAssert pImg.image_url.url == "https://example.com/a.png"
   doAssert pImg.image_url.detail == ImageDetail.high
 
-  let pAudio = inputAudioPart("base64audio", InputAudioFormat.mp3)
+  let pAudio = partInputAudio("base64audio", InputAudioFormat.mp3)
   doAssert pAudio.`type` == ChatCompletionContentPartType.input_audio
   doAssert pAudio.input_audio.data == "base64audio"
   doAssert pAudio.input_audio.format == InputAudioFormat.mp3
 
-  let cText = textContent("hello")
+  let cText = contentText("hello")
   doAssert cText.kind == ChatCompletionInputContentKind.text
   doAssert cText.text == "hello"
 
-  let cParts = partsContent([pText, pImg, pAudio])
+  let cParts = contentParts([pText, pImg, pAudio])
   doAssert cParts.kind == ChatCompletionInputContentKind.parts
   doAssert cParts.parts.len == 3
   doAssert cParts.parts[1].`type` == ChatCompletionContentPartType.image_url
 
-  let mSystem = msgSystem("rules", name = "sys")
+  let mSystem = systemMessageText("rules", name = "sys")
   doAssert mSystem.role == ChatMessageRole.system
   doAssert mSystem.content.kind == ChatCompletionInputContentKind.text
   doAssert mSystem.content.text == "rules"
   doAssert mSystem.name == "sys"
 
-  let mUserText = msgUserText("ask")
+  let mUserText = userMessageText("ask")
   doAssert mUserText.role == ChatMessageRole.user
   doAssert mUserText.content.kind == ChatCompletionInputContentKind.text
   doAssert mUserText.content.text == "ask"
 
-  let mUserParts = msgUserParts([pText, pImg], name = "u")
+  let mUserParts = userMessageParts([pText, pImg], name = "u")
   doAssert mUserParts.role == ChatMessageRole.user
   doAssert mUserParts.content.kind == ChatCompletionInputContentKind.parts
   doAssert mUserParts.content.parts.len == 2
   doAssert mUserParts.name == "u"
 
-  let mAssistant = msgAssistant("draft")
+  let mAssistant = assistantMessageText("draft")
   doAssert mAssistant.role == ChatMessageRole.assistant
   doAssert mAssistant.content.kind == ChatCompletionInputContentKind.text
   doAssert mAssistant.content.text == "draft"
 
-  let mTool = msgTool("result-json", "call_99", name = "tool-name")
+  let mTool = toolMessageText("result-json", "call_99", name = "tool-name")
   doAssert mTool.role == ChatMessageRole.tool
   doAssert mTool.content.kind == ChatCompletionInputContentKind.text
   doAssert mTool.content.text == "result-json"
   doAssert mTool.tool_call_id == "call_99"
   doAssert mTool.name == "tool-name"
 
-  let tool = functionTool("lookup", "search docs")
+  let tool = toolFunction("lookup", "search docs")
   doAssert tool.`type` == ChatToolType.function
   doAssert tool.function.name == "lookup"
   doAssert tool.function.description == "search docs"
 
-  doAssert responseFormatText().`type` == ResponseFormatType.text
-  doAssert responseFormatJsonObject().`type` == ResponseFormatType.json_object
-  doAssert responseFormatJsonSchema().`type` == ResponseFormatType.json_schema
-  doAssert responseFormatRegex().`type` == ResponseFormatType.regex
+  doAssert formatText().`type` == ResponseFormatType.text
+  doAssert formatJsonObject().`type` == ResponseFormatType.json_object
+  doAssert formatJsonSchema().`type` == ResponseFormatType.json_schema
+  doAssert formatRegex().`type` == ResponseFormatType.regex
 
-proc testResponsesCreateParamsBuilder() =
-  let request = responsesCreateParams(
+proc testChatCreateParamsBuilder() =
+  let request = chatCreate(
     model = "gpt-4.1",
-    messages = [msgSystem("sys"), msgUserParts([textPart("what?")])],
+    messages = [systemMessageText("sys"), userMessageParts([partText("what?")])],
     stream = true,
     temperature = 0.75,
     maxTokens = 321,
-    tools = [functionTool("calc", "math")],
+    tools = [toolFunction("calc", "math")],
     toolChoice = ToolChoice.required,
-    responseFormat = responseFormatJsonObject()
+    responseFormat = formatJsonObject()
   )
 
   doAssert request.model == "gpt-4.1"
@@ -190,21 +190,21 @@ proc testResponsesCreateParamsBuilder() =
   doAssert request.response_format.`type` == ResponseFormatType.json_object
 
 proc testSerializationRoundTripForBuiltRequest() =
-  let request = responsesCreateParams(
+  let request = chatCreate(
     model = "gpt-4.1-mini",
     messages = [
-      msgUserParts([
-        textPart("describe"),
-        imageUrlPart("https://example.com/1.jpg", detail = ImageDetail.low),
-        inputAudioPart("ZGF0YQ==", InputAudioFormat.wav)
+      userMessageParts([
+        partText("describe"),
+        partImageUrl("https://example.com/1.jpg", detail = ImageDetail.low),
+        partInputAudio("ZGF0YQ==", InputAudioFormat.wav)
       ])
     ],
     maxTokens = 128,
-    tools = [functionTool("extract")],
-    responseFormat = responseFormatText()
+    tools = [toolFunction("extract")],
+    responseFormat = formatText()
   )
   let serialized = toJson(request)
-  let parsed = fromJson(serialized, ResponsesCreateParams)
+  let parsed = fromJson(serialized, ChatCreateParams)
   doAssert parsed.model == request.model
   doAssert parsed.messages.len == 1
   doAssert parsed.messages[0].content.kind == ChatCompletionInputContentKind.parts
@@ -213,15 +213,15 @@ proc testSerializationRoundTripForBuiltRequest() =
 
 proc testStreamingFlagPassesThrough() =
   let cfg = sampleConfig()
-  let req = responsesCreateRequest(cfg, sampleParams(streamValue = true))
-  let payload = fromJson(req.body, ResponsesCreateParams)
+  let req = chatRequest(cfg, sampleParams(streamValue = true))
+  let payload = fromJson(req.body, ChatCreateParams)
   doAssert payload.stream
 
-proc testAddResponsesCreate() =
+proc testChatAdd() =
   let cfg = sampleConfig(apiKey = "batch-token")
   var batch: RequestBatch
-  addResponsesCreate(batch, cfg, sampleParams(), requestId = 11, timeoutMs = 1_500)
-  addResponsesCreate(batch, cfg, sampleParams(), requestId = 12)
+  chatAdd(batch, cfg, sampleParams(), requestId = 11, timeoutMs = 1_500)
+  chatAdd(batch, cfg, sampleParams(), requestId = 12)
 
   doAssert batch.len == 2
   doAssert batch[0].verb == hvPost
@@ -232,9 +232,9 @@ proc testAddResponsesCreate() =
   doAssert batch[0].headers["Content-Type"] == "application/json"
   doAssert batch[1].requestId == 12
 
-proc testTryDecodeResponsesCreate() =
-  var decoded: ResponsesCreateResult
-  doAssert tryDecodeResponsesCreate(GoodResponse, decoded)
+proc testChatParse() =
+  var decoded: ChatCreateResult
+  doAssert chatParse(GoodResponse, decoded)
   doAssert decoded.id == "cmpl_1"
   doAssert decoded.model == "gpt-4.1-mini"
   doAssert decoded.choices.len == 1
@@ -242,51 +242,51 @@ proc testTryDecodeResponsesCreate() =
   doAssert decoded.choices[0].message.content.text == "Hello"
   doAssert decoded.usage.total_tokens == 3
 
-  var bad: ResponsesCreateResult
-  doAssert not tryDecodeResponsesCreate("{", bad)
+  var bad: ChatCreateResult
+  doAssert not chatParse("{", bad)
 
 proc testResponseGettersWithTextContent() =
-  var parsed: ResponsesCreateResult
-  doAssert tryDecodeResponsesCreate(GoodResponse, parsed)
-  doAssert responseId(parsed) == "cmpl_1"
-  doAssert responseModel(parsed) == "gpt-4.1-mini"
-  doAssert choiceCount(parsed) == 1
-  doAssert finishReason(parsed) == "stop"
-  doAssert assistantText(parsed) == "Hello"
-  doAssert assistantPartsText(parsed).len == 0
-  doAssert usagePromptTokens(parsed) == 1
-  doAssert usageCompletionTokens(parsed) == 2
-  doAssert usageTotalTokens(parsed) == 3
-  doAssert toolCalls(parsed).len == 0
-  doAssert firstToolCallName(parsed) == ""
-  doAssert firstToolCallArguments(parsed) == ""
+  var parsed: ChatCreateResult
+  doAssert chatParse(GoodResponse, parsed)
+  doAssert idOf(parsed) == "cmpl_1"
+  doAssert modelOf(parsed) == "gpt-4.1-mini"
+  doAssert choices(parsed) == 1
+  doAssert finish(parsed) == "stop"
+  doAssert firstText(parsed) == "Hello"
+  doAssert allTextParts(parsed).len == 0
+  doAssert promptTokens(parsed) == 1
+  doAssert completionTokens(parsed) == 2
+  doAssert totalTokens(parsed) == 3
+  doAssert calls(parsed).len == 0
+  doAssert firstCallName(parsed) == ""
+  doAssert firstCallArgs(parsed) == ""
 
 proc testResponseGettersWithPartsAndToolCalls() =
-  var parsed: ResponsesCreateResult
-  doAssert tryDecodeResponsesCreate(PartsResponse, parsed)
-  doAssert finishReason(parsed) == "tool_calls"
-  doAssert assistantText(parsed) == "first"
-  doAssert assistantPartsText(parsed) == @["first", "second"]
-  doAssert toolCalls(parsed).len == 1
-  doAssert firstToolCallName(parsed) == "lookup"
-  doAssert firstToolCallArguments(parsed) == "{\"q\":\"nim\"}"
+  var parsed: ChatCreateResult
+  doAssert chatParse(PartsResponse, parsed)
+  doAssert finish(parsed) == "tool_calls"
+  doAssert firstText(parsed) == "first"
+  doAssert allTextParts(parsed) == @["first", "second"]
+  doAssert calls(parsed).len == 1
+  doAssert firstCallName(parsed) == "lookup"
+  doAssert firstCallArgs(parsed) == "{\"q\":\"nim\"}"
 
 proc testResponseGetterDefaultsOnMissingChoice() =
-  let empty = ResponsesCreateResult()
-  doAssert responseId(empty) == ""
-  doAssert responseModel(empty) == ""
-  doAssert choiceCount(empty) == 0
-  doAssert finishReason(empty) == ""
-  doAssert finishReason(empty, i = 6) == ""
-  doAssert assistantText(empty) == ""
-  doAssert assistantText(empty, i = 2) == ""
-  doAssert assistantPartsText(empty).len == 0
-  doAssert toolCalls(empty).len == 0
-  doAssert firstToolCallName(empty) == ""
-  doAssert firstToolCallArguments(empty) == ""
-  doAssert usagePromptTokens(empty) == 0
-  doAssert usageCompletionTokens(empty) == 0
-  doAssert usageTotalTokens(empty) == 0
+  let empty = ChatCreateResult()
+  doAssert idOf(empty) == ""
+  doAssert modelOf(empty) == ""
+  doAssert choices(empty) == 0
+  doAssert finish(empty) == ""
+  doAssert finish(empty, i = 6) == ""
+  doAssert firstText(empty) == ""
+  doAssert firstText(empty, i = 2) == ""
+  doAssert allTextParts(empty).len == 0
+  doAssert calls(empty).len == 0
+  doAssert firstCallName(empty) == ""
+  doAssert firstCallArgs(empty) == ""
+  doAssert promptTokens(empty) == 0
+  doAssert completionTokens(empty) == 0
+  doAssert totalTokens(empty) == 0
 
 proc testHttpSuccessClassifier() =
   doAssert isHttpSuccess(200)
@@ -320,12 +320,12 @@ proc testRetriableStatusClassifier() =
 
 when isMainModule:
   testInputConstructorsCoverage()
-  testResponsesCreateParamsBuilder()
+  testChatCreateParamsBuilder()
   testSerializationRoundTripForBuiltRequest()
-  testResponsesCreateRequest()
+  testChatRequest()
   testStreamingFlagPassesThrough()
-  testAddResponsesCreate()
-  testTryDecodeResponsesCreate()
+  testChatAdd()
+  testChatParse()
   testResponseGettersWithTextContent()
   testResponseGettersWithPartsAndToolCalls()
   testResponseGetterDefaultsOnMissingChoice()

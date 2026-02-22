@@ -13,14 +13,14 @@ proc buildBase64ImageDataUrl(path: string): string =
   let imageBytes = readFile(path)
   result = "data:image/jpeg;base64," & encode(imageBytes)
 
-proc runOcr(client: Relay; endpoint: EndpointConfig; params: ResponsesCreateParams;
-    retryPolicy: RetryPolicy): ResponsesCreateResult =
+proc runOcr(client: Relay; endpoint: OpenAIConfig; params: ChatCreateParams;
+    retryPolicy: RetryPolicy): ChatCreateResult =
   var rng = initRand(seed = epochTime().int64)
   let maxAttempts = max(1, retryPolicy.maxAttempts)
   var done = false
   var lastError = "request failed without error details"
   for attempt in 1..maxAttempts:
-    let req = responsesCreateRequest(
+    let req = chatRequest(
       cfg = endpoint,
       params = params,
       requestId = int64(attempt),
@@ -37,8 +37,8 @@ proc runOcr(client: Relay; endpoint: EndpointConfig; params: ResponsesCreatePara
           " message=" & item.error.message
     else:
       if isHttpSuccess(item.response.code):
-        var parsed: ResponsesCreateResult
-        if tryDecodeResponsesCreate(item.response.body, parsed):
+        var parsed: ChatCreateResult
+        if chatParse(item.response.body, parsed):
           result = parsed
           done = true
         else:
@@ -66,21 +66,21 @@ proc main =
   let localImagePath = "test.jpg"
   let imageDataUrl = buildBase64ImageDataUrl(localImagePath)
 
-  let params = responsesCreateParams(
+  let params = chatCreate(
     model = ModelName,
     messages = [
-      msgUserParts([
-        textPart("Extract all readable text exactly."),
-        imageUrlPart(imageDataUrl)
+      userMessageParts([
+        partText("Extract all readable text exactly."),
+        partImageUrl(imageDataUrl)
       ])
     ],
     temperature = 0.0,
     maxTokens = 256,
     toolChoice = ToolChoice.none,
-    responseFormat = responseFormatText()
+    responseFormat = formatText()
   )
 
-  let endpoint = EndpointConfig(
+  let endpoint = OpenAIConfig(
     url: ApiUrl,
     apiKey: apiKey
   )
@@ -95,9 +95,9 @@ proc main =
   defer: client.close()
 
   let parsed = runOcr(client, endpoint, params, retryPolicy)
-  echo "model=", responseModel(parsed)
-  echo "choices=", choiceCount(parsed)
-  echo "assistant_text=", assistantText(parsed)
+  echo "model=", modelOf(parsed)
+  echo "choices=", choices(parsed)
+  echo "assistant_text=", firstText(parsed)
 
 when isMainModule:
   main()
