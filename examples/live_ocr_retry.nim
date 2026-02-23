@@ -19,8 +19,8 @@ proc imageAsDataUrl(path: string): string =
 proc buildOcrParams(imageDataUrl: string): ChatCreateParams =
   chatCreate(
     model = ModelName,
-    messages = [
-      userMessageParts([
+    messages = @[
+      userMessageParts(@[
         partText(OcrInstruction),
         partImageUrl(imageDataUrl)
       ])

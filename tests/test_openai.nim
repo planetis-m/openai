@@ -63,7 +63,7 @@ proc sampleParams(streamValue = false): ChatCreateParams =
     temperature = 0.2,
     maxTokens = 64,
     responseFormat = formatText,
-    messages = [
+    messages = @[
       userMessageText("ping")
     ]
   )
@@ -122,7 +122,7 @@ proc testInputConstructorsCoverage() =
   doAssert cText.kind == ChatCompletionInputContentKind.text
   doAssert cText.text == "hello"
 
-  let cParts = contentParts([pText, pImg, pAudio])
+  let cParts = contentParts(@[pText, pImg, pAudio])
   doAssert cParts.kind == ChatCompletionInputContentKind.parts
   doAssert cParts.parts.len == 3
   doAssert cParts.parts[1].`type` == ChatCompletionContentPartType.image_url
@@ -138,7 +138,7 @@ proc testInputConstructorsCoverage() =
   doAssert mUserText.content.kind == ChatCompletionInputContentKind.text
   doAssert mUserText.content.text == "ask"
 
-  let mUserParts = userMessageParts([pText, pImg], name = "u")
+  let mUserParts = userMessageParts(@[pText, pImg], name = "u")
   doAssert mUserParts.role == ChatMessageRole.user
   doAssert mUserParts.content.kind == ChatCompletionInputContentKind.parts
   doAssert mUserParts.content.parts.len == 2
@@ -169,11 +169,11 @@ proc testInputConstructorsCoverage() =
 proc testChatCreateParamsBuilder() =
   let request = chatCreate(
     model = "gpt-4.1",
-    messages = [systemMessageText("sys"), userMessageParts([partText("what?")])],
+    messages = @[systemMessageText("sys"), userMessageParts(@[partText("what?")])],
     stream = true,
     temperature = 0.75,
     maxTokens = 321,
-    tools = [toolFunction("calc", "math")],
+    tools = @[toolFunction("calc", "math")],
     toolChoice = ToolChoice.required,
     responseFormat = formatJsonObject
   )
@@ -192,15 +192,15 @@ proc testChatCreateParamsBuilder() =
 proc testSerializationRoundTripForBuiltRequest() =
   let request = chatCreate(
     model = "gpt-4.1-mini",
-    messages = [
-      userMessageParts([
+    messages = @[
+      userMessageParts(@[
         partText("describe"),
         partImageUrl("https://example.com/1.jpg", detail = ImageDetail.low),
         partInputAudio("ZGF0YQ==", InputAudioFormat.wav)
       ])
     ],
     maxTokens = 128,
-    tools = [toolFunction("extract")],
+    tools = @[toolFunction("extract")],
     responseFormat = formatText
   )
   let serialized = toJson(request)

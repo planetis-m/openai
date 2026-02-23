@@ -15,7 +15,7 @@ const
 proc buildParams(prompt: string): ChatCreateParams =
   chatCreate(
     model = ModelName,
-    messages = [userMessageText(prompt)],
+    messages = @[userMessageText(prompt)],
     temperature = 0.0,
     maxTokens = 48,
     toolChoice = ToolChoice.none,

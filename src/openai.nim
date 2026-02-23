@@ -46,10 +46,10 @@ proc contentText*(text: sink string): ChatCompletionMessageContent =
     text: text
   )
 
-proc contentParts*(parts: openArray[ChatCompletionContentPart]): ChatCompletionMessageContent =
+proc contentParts*(parts: sink seq[ChatCompletionContentPart]): ChatCompletionMessageContent =
   ChatCompletionMessageContent(
     kind: ChatCompletionInputContentKind.parts,
-    parts: @parts
+    parts: parts
   )
 
 proc systemMessageText*(text: sink string; name: sink string = ""): ChatMessage =
@@ -66,7 +66,7 @@ proc userMessageText*(text: sink string; name: sink string = ""): ChatMessage =
     name: name
   )
 
-proc userMessageParts*(parts: openArray[ChatCompletionContentPart];
+proc userMessageParts*(parts: sink seq[ChatCompletionContentPart];
     name: sink string = ""): ChatMessage =
   ChatMessage(
     role: ChatMessageRole.user,
@@ -104,18 +104,18 @@ const
   formatJsonSchema* = ResponseFormat(`type`: ResponseFormatType.json_schema)
   formatRegex* = ResponseFormat(`type`: ResponseFormatType.regex)
 
-proc chatCreate*(model: sink string; messages: openArray[ChatMessage];
+proc chatCreate*(model: sink string; messages: sink seq[ChatMessage];
     stream = false; temperature = 1.0; maxTokens = 0;
-    tools: openArray[ChatTool] = [];
+    tools: sink seq[ChatTool] = @[];
     toolChoice = ToolChoice.none;
     responseFormat = formatText): ChatCreateParams =
   ChatCreateParams(
     model: model,
-    messages: @messages,
+    messages: messages,
     stream: stream,
     temperature: temperature,
     max_tokens: maxTokens,
-    tools: @tools,
+    tools: tools,
     tool_choice: toolChoice,
     response_format: responseFormat
   )

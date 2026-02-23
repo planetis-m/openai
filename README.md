@@ -42,7 +42,7 @@ Build requests with readable helpers:
 ```nim
 let params = chatCreate(
   model = "gpt-4.1-mini",
-  messages = [
+  messages = @[
     systemMessageText("Be concise."),
     userMessageText("Explain retry jitter in one sentence.")
   ],
@@ -88,7 +88,7 @@ proc main() =
 
   let params = chatCreate(
     model = "gpt-4.1-mini",
-    messages = [userMessageText("Write one short Nim tip.")],
+    messages = @[userMessageText("Write one short Nim tip.")],
     temperature = 0.2,
     maxTokens = 48,
     toolChoice = ToolChoice.none,
@@ -128,11 +128,11 @@ proc main() =
   var batch: RequestBatch
   chatAdd(batch, cfg, chatCreate(
     model = "gpt-4.1-mini",
-    messages = [userMessageText("Define gradient descent in one sentence.")]
+    messages = @[userMessageText("Define gradient descent in one sentence.")]
   ), requestId = 1)
   chatAdd(batch, cfg, chatCreate(
     model = "gpt-4.1-mini",
-    messages = [userMessageText("Define dropout in one sentence.")]
+    messages = @[userMessageText("Define dropout in one sentence.")]
   ), requestId = 2)
 
   client.startRequests(batch)
@@ -155,8 +155,8 @@ when isMainModule:
 ```nim
 let params = chatCreate(
   model = "gpt-4.1-mini",
-  messages = [
-    userMessageParts([
+  messages = @[
+    userMessageParts(@[
       partText("Describe this image."),
       partImageUrl("data:image/jpeg;base64,...")
     ])
