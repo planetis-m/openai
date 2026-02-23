@@ -25,6 +25,9 @@ jobs:
           nim-version: stable
           repo-token: ${{ github.token }}
 
+      - name: Install Nim dependencies
+        run: atlas install
+
       - name: Install libcurl (Linux)
         if: runner.os == 'Linux'
         run: |
