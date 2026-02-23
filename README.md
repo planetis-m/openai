@@ -62,11 +62,11 @@ let item = client.makeRequest(chatRequest(cfg, params))
 Parse and access important fields quickly:
 
 ```nim
-var out: ChatCreateResult
-discard chatParse(item.response.body, out)
-echo "model=", modelOf(out)
-echo "text=", firstText(out)
-echo "tokens=", totalTokens(out)
+var parsed: ChatCreateResult
+discard chatParse(item.response.body, parsed)
+echo "model=", modelOf(parsed)
+echo "text=", firstText(parsed)
+echo "tokens=", totalTokens(parsed)
 ```
 
 ## Quick Start
@@ -88,7 +88,7 @@ proc main() =
 
   let params = chatCreate(
     model = "gpt-4.1-mini",
-    messages = [userMessageText("Give one Nim productivity tip.")],
+    messages = [userMessageText("Write one short Nim tip.")],
     temperature = 0.2,
     maxTokens = 48,
     toolChoice = ToolChoice.none,
@@ -99,60 +99,98 @@ proc main() =
   defer: client.close()
 
   let item = client.makeRequest(chatRequest(cfg, params))
-  var out: ChatCreateResult
-  discard chatParse(item.response.body, out)
-  echo firstText(out)
+  var parsed: ChatCreateResult
+  discard chatParse(item.response.body, parsed)
+
+  echo "model=", modelOf(parsed)
+  echo "text=", firstText(parsed)
 
 when isMainModule:
   main()
 ```
 
-## Batching and Polling
-
-Relay returns results in completion order. This library keeps that model intact:
+## Batch Polling Flow
 
 ```nim
-var batch: RequestBatch
-chatAdd(batch, cfg, chatCreate(
-  model = "gpt-4.1-mini",
-  messages = [userMessageText("Define SGD in one sentence.")]
-), requestId = 1)
-chatAdd(batch, cfg, chatCreate(
-  model = "gpt-4.1-mini",
-  messages = [userMessageText("Define Adam optimizer in one sentence.")]
-), requestId = 2)
+import std/os
+import relay
+import openai
 
-client.startRequests(batch)
+{.passL: "-lcurl".}
+
+const ApiUrl = "https://api.openai.com/v1/chat/completions"
+
+proc main() =
+  let cfg = OpenAIConfig(url: ApiUrl, apiKey: getEnv("OPENAI_API_KEY"))
+  var client = newRelay(maxInFlight = 4, defaultTimeoutMs = 30_000)
+  defer: client.close()
+
+  var batch: RequestBatch
+  chatAdd(batch, cfg, chatCreate(
+    model = "gpt-4.1-mini",
+    messages = [userMessageText("Define gradient descent in one sentence.")]
+  ), requestId = 1)
+  chatAdd(batch, cfg, chatCreate(
+    model = "gpt-4.1-mini",
+    messages = [userMessageText("Define dropout in one sentence.")]
+  ), requestId = 2)
+
+  client.startRequests(batch)
+
+  var remaining = batch.len
+  while remaining > 0:
+    var item: RequestResult
+    if client.waitForResult(item):
+      var parsed: ChatCreateResult
+      discard chatParse(item.response.body, parsed)
+      echo item.response.request.requestId, ": ", firstText(parsed)
+      dec remaining
+
+when isMainModule:
+  main()
 ```
 
-## Multimodal and Tooling
+## Multimodal Message Parts
 
 ```nim
-let multimodal = chatCreate(
+let params = chatCreate(
   model = "gpt-4.1-mini",
   messages = [
     userMessageParts([
-      partText("Describe the image."),
+      partText("Describe this image."),
       partImageUrl("data:image/jpeg;base64,...")
     ])
   ],
-  tools = [toolFunction("extractFields", "Extract structured fields from text")],
-  toolChoice = ToolChoice.auto,
+  toolChoice = ToolChoice.none,
   responseFormat = formatText
 )
 ```
 
-## Optional Retry Policy
+## Optional Retry Module
 
-Import `openai_retry` only when you want built-in backoff helpers:
+`openai_retry` is optional and transport-agnostic.
 
 ```nim
 import std/[random, times]
+import relay
+import openai
 import openai_retry
 
-let policy = defaultRetryPolicy(maxAttempts = 5)
-var rng = initRand(epochTime().int64)
-let delayMs = retryDelayMs(rng, attempt = 2, policy = policy)
+proc requestWithRetry(client: Relay; cfg: OpenAIConfig;
+    params: ChatCreateParams): ChatCreateResult =
+  let policy = defaultRetryPolicy(maxAttempts = 5)
+  var rng = initRand(epochTime().int64)
+  let maxAttempts = max(1, policy.maxAttempts)
+
+  for attempt in 1..maxAttempts:
+    let item = client.makeRequest(chatRequest(cfg, params, requestId = attempt.int64))
+    discard chatParse(item.response.body, result)
+    let canRetry = attempt < maxAttempts and
+      (isRetriableTransport(item.error.kind) or isRetriableStatus(item.response.code))
+    if canRetry:
+      sleep(retryDelayMs(rng, attempt, policy))
+    else:
+      break
 ```
 
 ## API Cheat Sheet

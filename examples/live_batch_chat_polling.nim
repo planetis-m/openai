@@ -12,13 +12,6 @@ const
   MaxQueuedOrInFlight = 6
   RequestTimeoutMs = 30_000
 
-proc summarizeText(text: string; maxLen = 80): string =
-  let oneLine = text.replace("\n", " ").strip()
-  if oneLine.len > maxLen:
-    result = oneLine[0 ..< maxLen] & "..."
-  else:
-    result = oneLine
-
 proc buildParams(prompt: string): ChatCreateParams =
   chatCreate(
     model = ModelName,
@@ -35,7 +28,7 @@ proc printCompletion(item: RequestResult) =
   echo "completed id=", item.response.request.requestId,
     " status=", item.response.code,
     " error=", item.error.kind,
-    " text=\"", summarizeText(firstText(parsed)), "\""
+    " text=\"", firstText(parsed), "\""
 
 proc main() =
   let apiKey = getEnv("DEEPINFRA_API_KEY")
