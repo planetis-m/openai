@@ -1,6 +1,6 @@
 # Package
 version = "0.1.0"
-author = "openai"
+author = "planetis-m"
 description = "OpenAI-style chat-completions helpers for Nim + relay"
 license = "MIT"
 srcDir = "src"

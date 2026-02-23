@@ -4,21 +4,23 @@ import openai_schema
 
 export openai_schema
 
+const OpenAIApiUrl = "https://api.openai.com/v1/chat/completions"
+
 type
   ChatCreateParams* = OpenAIChatCompletionsIn
   ChatCreateResult* = OpenAIChatCompletionOut
 
   OpenAIConfig* = object
-    url*: string
+    url*: string = OpenAIApiUrl
     apiKey*: string
 
-proc partText*(text: string): ChatCompletionContentPart =
+proc partText*(text: sink string): ChatCompletionContentPart =
   ChatCompletionContentPart(
     `type`: ChatCompletionContentPartType.text,
     text: text
   )
 
-proc partImageUrl*(url: string;
+proc partImageUrl*(url: sink string;
     detail = ImageDetail.auto): ChatCompletionContentPart =
   ChatCompletionContentPart(
     `type`: ChatCompletionContentPartType.image_url,
@@ -28,7 +30,7 @@ proc partImageUrl*(url: string;
     )
   )
 
-proc partInputAudio*(data: string;
+proc partInputAudio*(data: sink string;
     format: InputAudioFormat): ChatCompletionContentPart =
   ChatCompletionContentPart(
     `type`: ChatCompletionContentPartType.input_audio,
@@ -38,7 +40,7 @@ proc partInputAudio*(data: string;
     )
   )
 
-proc contentText*(text: string): ChatCompletionMessageContent =
+proc contentText*(text: sink string): ChatCompletionMessageContent =
   ChatCompletionMessageContent(
     kind: ChatCompletionInputContentKind.text,
     text: text
@@ -50,14 +52,14 @@ proc contentParts*(parts: openArray[ChatCompletionContentPart]): ChatCompletionM
     parts: @parts
   )
 
-proc systemMessageText*(text: string; name = ""): ChatMessage =
+proc systemMessageText*(text: sink string; name: sink string = ""): ChatMessage =
   ChatMessage(
     role: ChatMessageRole.system,
     content: contentText(text),
     name: name
   )
 
-proc userMessageText*(text: string; name = ""): ChatMessage =
+proc userMessageText*(text: sink string; name: sink string = ""): ChatMessage =
   ChatMessage(
     role: ChatMessageRole.user,
     content: contentText(text),
@@ -65,21 +67,21 @@ proc userMessageText*(text: string; name = ""): ChatMessage =
   )
 
 proc userMessageParts*(parts: openArray[ChatCompletionContentPart];
-    name = ""): ChatMessage =
+    name: sink string = ""): ChatMessage =
   ChatMessage(
     role: ChatMessageRole.user,
     content: contentParts(parts),
     name: name
   )
 
-proc assistantMessageText*(text: string; name = ""): ChatMessage =
+proc assistantMessageText*(text: sink string; name: sink string = ""): ChatMessage =
   ChatMessage(
     role: ChatMessageRole.assistant,
     content: contentText(text),
     name: name
   )
 
-proc toolMessageText*(text: string; toolCallId: string; name = ""): ChatMessage =
+proc toolMessageText*(text, toolCallId: sink string; name: sink string = ""): ChatMessage =
   ChatMessage(
     role: ChatMessageRole.tool,
     content: contentText(text),
@@ -87,7 +89,7 @@ proc toolMessageText*(text: string; toolCallId: string; name = ""): ChatMessage 
     tool_call_id: toolCallId
   )
 
-proc toolFunction*(name: string; description = ""): ChatTool =
+proc toolFunction*(name: sink string; description: sink string = ""): ChatTool =
   ChatTool(
     `type`: ChatToolType.function,
     function: FunctionDefinition(
@@ -102,10 +104,10 @@ const
   formatJsonSchema* = ResponseFormat(`type`: ResponseFormatType.json_schema)
   formatRegex* = ResponseFormat(`type`: ResponseFormatType.regex)
 
-proc chatCreate*(model: string; messages: openArray[ChatMessage];
+proc chatCreate*(model: sink string; messages: openArray[ChatMessage];
     stream = false; temperature = 1.0; maxTokens = 0;
     tools: openArray[ChatTool] = [];
-    toolChoice = ToolChoice.auto;
+    toolChoice = ToolChoice.none;
     responseFormat = formatText): ChatCreateParams =
   ChatCreateParams(
     model: model,
@@ -156,42 +158,42 @@ proc chatParse*(body: string; dst: var ChatCreateResult): bool =
     result = false
 
 proc isHttpSuccess*(code: int): bool {.inline.} =
-  code div 100 == 2
+  result = code div 100 == 2
 
 proc isRetriableTransport*(kind: TransportErrorKind): bool {.inline.} =
   case kind
   of teTimeout, teNetwork, teDns, teTls, teInternal:
-    true
+    result = true
   of teNone, teCanceled, teProtocol:
-    false
+    result = false
 
 proc isRetriableStatus*(code: int): bool {.inline.} =
   case code
   of 408, 409, 425, 429:
-    true
+    result = true
   else:
-    code >= 500 and code <= 599
+    result = code >= 500 and code <= 599
 
-proc idOf*(x: ChatCreateResult): string {.inline.} =
-  x.id
+proc idOf*(x: ChatCreateResult): lent string {.inline.} =
+  result = x.id
 
-proc modelOf*(x: ChatCreateResult): string {.inline.} =
-  x.model
+proc modelOf*(x: ChatCreateResult): lent string {.inline.} =
+  result = x.model
 
 proc promptTokens*(x: ChatCreateResult): int {.inline.} =
-  x.usage.prompt_tokens
+  result = x.usage.prompt_tokens
 
 proc completionTokens*(x: ChatCreateResult): int {.inline.} =
-  x.usage.completion_tokens
+  result = x.usage.completion_tokens
 
 proc totalTokens*(x: ChatCreateResult): int {.inline.} =
-  x.usage.total_tokens
+  result = x.usage.total_tokens
 
 proc choices*(x: ChatCreateResult): int {.inline.} =
-  x.choices.len
+  result = x.choices.len
 
 proc hasChoiceAt(x: ChatCreateResult; i: int): bool {.inline.} =
-  i >= 0 and i < x.choices.len
+  result = i >= 0 and i < x.choices.len
 
 proc finish*(x: ChatCreateResult; i = 0): string =
   if not x.hasChoiceAt(i):
@@ -209,7 +211,7 @@ proc firstText*(x: ChatCreateResult; i = 0): string =
     of ChatCompletionAssistantContentKind.parts:
       for part in content.parts:
         if result.len == 0 and part.text.len > 0:
-          result = part.text
+          return part.text
 
 proc allTextParts*(x: ChatCreateResult; i = 0): seq[string] =
   result = @[]
@@ -219,8 +221,7 @@ proc allTextParts*(x: ChatCreateResult; i = 0): seq[string] =
       for part in content.parts:
         result.add(part.text)
 
-proc calls*(x: ChatCreateResult;
-    i = 0): seq[ChatCompletionMessageToolCall] =
+proc calls*(x: ChatCreateResult; i = 0): seq[ChatCompletionMessageToolCall] =
   result = @[]
   if x.hasChoiceAt(i):
     result = x.choices[i].message.tool_calls
