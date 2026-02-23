@@ -57,13 +57,17 @@ Send with Relay directly:
 
 ```nim
 let item = client.makeRequest(chatRequest(cfg, params))
+var parsed: ChatCreateResult
+if item.error.kind == teNone and item.response.code == 200 and
+    chatParse(item.response.body, parsed):
+  echo "model=", modelOf(parsed)
+  echo "text=", firstText(parsed)
+  echo "tokens=", totalTokens(parsed)
 ```
 
 Parse and access important fields quickly:
 
 ```nim
-var parsed: ChatCreateResult
-discard chatParse(item.response.body, parsed)
 echo "model=", modelOf(parsed)
 echo "text=", firstText(parsed)
 echo "tokens=", totalTokens(parsed)
@@ -100,10 +104,10 @@ proc main() =
 
   let item = client.makeRequest(chatRequest(cfg, params))
   var parsed: ChatCreateResult
-  discard chatParse(item.response.body, parsed)
-
-  echo "model=", modelOf(parsed)
-  echo "text=", firstText(parsed)
+  if item.error.kind == teNone and item.response.code == 200 and
+      chatParse(item.response.body, parsed):
+    echo "model=", modelOf(parsed)
+    echo "text=", firstText(parsed)
 
 when isMainModule:
   main()
