@@ -1,4 +1,5 @@
 import std/random
+import relay
 
 const
   RetryBaseDelayMs* = 250
@@ -44,3 +45,17 @@ proc retryDelayMs*(rng: var Rand; attempt: int; policy: RetryPolicy): int =
   let jitterMax = max(1, capped div max(1, policy.jitterDivisor))
   let jitter = rng.rand(jitterMax)
   result = capped + jitter
+
+proc isRetriableStatus*(code: int): bool {.inline.} =
+  case code
+  of 408, 409, 425, 429:
+    result = true
+  else:
+    result = code >= 500 and code <= 599
+
+proc isRetriableTransport*(kind: TransportErrorKind): bool {.inline.} =
+  case kind
+  of teTimeout, teNetwork, teDns, teTls, teInternal:
+    result = true
+  of teNone, teCanceled, teProtocol:
+    result = false

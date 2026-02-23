@@ -136,9 +136,10 @@ proc main() =
     messages = @[userMessageText("Define dropout in one sentence.")]
   ), requestId = 2)
 
+  # Capture size before startRequests(batch) moves the batch.
+  var remaining = batch.len
   client.startRequests(batch)
 
-  var remaining = batch.len
   while remaining > 0:
     var item: RequestResult
     if client.waitForResult(item):
@@ -169,7 +170,7 @@ let params = chatCreate(
 
 ## Optional Retry Module
 
-`openai_retry` is optional and transport-agnostic.
+`openai_retry` is optional.
 
 ```nim
 import std/[random, times]
@@ -206,6 +207,9 @@ proc requestWithRetry(client: Relay; cfg: OpenAIConfig;
   `idOf`, `modelOf`, `choices`, `finish`, `firstText`, `allTextParts`,
   `calls`, `firstCallName`, `firstCallArgs`, `promptTokens`,
   `completionTokens`, `totalTokens`
+- Retry helpers:
+  `defaultRetryPolicy`, `retryDelayMs`, `isRetriableStatus`,
+  `isRetriableTransport` (from `openai_retry`)
 
 ## Run Examples
 

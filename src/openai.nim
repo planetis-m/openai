@@ -160,20 +160,6 @@ proc chatParse*(body: string; dst: var ChatCreateResult): bool =
 proc isHttpSuccess*(code: int): bool {.inline.} =
   result = code div 100 == 2
 
-proc isRetriableTransport*(kind: TransportErrorKind): bool {.inline.} =
-  case kind
-  of teTimeout, teNetwork, teDns, teTls, teInternal:
-    result = true
-  of teNone, teCanceled, teProtocol:
-    result = false
-
-proc isRetriableStatus*(code: int): bool {.inline.} =
-  case code
-  of 408, 409, 425, 429:
-    result = true
-  else:
-    result = code >= 500 and code <= 599
-
 proc idOf*(x: ChatCreateResult): lent string {.inline.} =
   result = x.id
 

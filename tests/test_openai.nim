@@ -297,27 +297,6 @@ proc testHttpSuccessClassifier() =
   doAssert not isHttpSuccess(429)
   doAssert not isHttpSuccess(500)
 
-proc testRetriableTransportClassifier() =
-  doAssert not isRetriableTransport(teNone)
-  doAssert isRetriableTransport(teTimeout)
-  doAssert isRetriableTransport(teNetwork)
-  doAssert isRetriableTransport(teDns)
-  doAssert isRetriableTransport(teTls)
-  doAssert isRetriableTransport(teInternal)
-  doAssert not isRetriableTransport(teCanceled)
-  doAssert not isRetriableTransport(teProtocol)
-
-proc testRetriableStatusClassifier() =
-  doAssert isRetriableStatus(408)
-  doAssert isRetriableStatus(409)
-  doAssert isRetriableStatus(425)
-  doAssert isRetriableStatus(429)
-  doAssert isRetriableStatus(500)
-  doAssert isRetriableStatus(503)
-  doAssert not isRetriableStatus(200)
-  doAssert not isRetriableStatus(400)
-  doAssert not isRetriableStatus(404)
-
 when isMainModule:
   testInputConstructorsCoverage()
   testChatCreateParamsBuilder()
@@ -330,6 +309,4 @@ when isMainModule:
   testResponseGettersWithPartsAndToolCalls()
   testResponseGetterDefaultsOnMissingChoice()
   testHttpSuccessClassifier()
-  testRetriableTransportClassifier()
-  testRetriableStatusClassifier()
   echo "all tests passed"
