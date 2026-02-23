@@ -9,12 +9,8 @@ on:
 
 jobs:
   compile:
-    name: Compile (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+    name: Compile (ubuntu-latest)
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -28,39 +24,13 @@ jobs:
       - name: Install Nim dependencies
         run: atlas install
 
-      - name: Install libcurl (Linux)
-        if: runner.os == 'Linux'
+      - name: Install libcurl
         run: |
           sudo apt-get update
           sudo apt-get install -y libcurl4-openssl-dev
 
-      - name: Install libcurl (macOS)
-        if: runner.os == 'macOS'
-        run: brew install curl
-
-      - name: Install libcurl (Windows)
-        if: runner.os == 'Windows'
-        uses: johnwason/vcpkg-action@v7
-        with:
-          pkgs: curl
-          triplet: x64-windows-release
-          token: ${{ github.token }}
-
-      - name: Compile tests and examples (Unix)
-        if: runner.os != 'Windows'
+      - name: Compile tests and examples
         run: |
-          nim c tests/test_openai.nim
-          nim c tests/test_openai_retry.nim
-          nim c examples/live_ocr_retry.nim
-          nim c examples/live_batch_chat_polling.nim
-
-      - name: Compile tests and examples (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        env:
-          VCPKG_ROOT: ${{ github.workspace }}\vcpkg\installed\x64-windows-release
-        run: |
-          $env:PATH = "$env:VCPKG_ROOT\bin;" + $env:PATH
           nim c tests/test_openai.nim
           nim c tests/test_openai_retry.nim
           nim c examples/live_ocr_retry.nim

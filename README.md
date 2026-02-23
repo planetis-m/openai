@@ -77,8 +77,7 @@ echo "tokens=", totalTokens(parsed)
 
 ```nim
 import std/os
-import relay
-import openai
+import relay, openai
 
 {.passL: "-lcurl".}
 
@@ -109,16 +108,14 @@ proc main() =
     echo "model=", modelOf(parsed)
     echo "text=", firstText(parsed)
 
-when isMainModule:
-  main()
+main()
 ```
 
 ## Batch Polling Flow
 
 ```nim
 import std/os
-import relay
-import openai
+import relay, openai
 
 {.passL: "-lcurl".}
 
@@ -146,12 +143,12 @@ proc main() =
     var item: RequestResult
     if client.waitForResult(item):
       var parsed: ChatCreateResult
-      discard chatParse(item.response.body, parsed)
-      echo item.response.request.requestId, ": ", firstText(parsed)
+      if item.error.kind == teNone and item.response.code == 200 and
+          chatParse(item.response.body, parsed):
+        echo item.response.request.requestId, ": ", firstText(parsed)
       dec remaining
 
-when isMainModule:
-  main()
+main()
 ```
 
 ## Multimodal Message Parts
@@ -176,9 +173,7 @@ let params = chatCreate(
 
 ```nim
 import std/[random, times]
-import relay
-import openai
-import openai_retry
+import relay, openai, openai_retry
 
 proc requestWithRetry(client: Relay; cfg: OpenAIConfig;
     params: ChatCreateParams): ChatCreateResult =
