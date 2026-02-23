@@ -98,7 +98,7 @@ proc toolFunction*(name: sink string; description: sink string = ""): ChatTool =
     )
   )
 
-const
+let
   formatText* = ResponseFormat(`type`: ResponseFormatType.text)
   formatJsonObject* = ResponseFormat(`type`: ResponseFormatType.json_object)
   formatJsonSchema* = ResponseFormat(`type`: ResponseFormatType.json_schema)
