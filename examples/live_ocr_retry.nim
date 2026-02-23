@@ -80,7 +80,7 @@ proc main() =
     jitterDivisor = RetryJitterDivisor
   )
 
-  var client = newRelay(maxInFlight = 1, defaultTimeoutMs = RequestTimeoutMs)
+  let client = newRelay(maxInFlight = 1, defaultTimeoutMs = RequestTimeoutMs)
   defer: client.close()
 
   let parsed = requestWithRetry(client, endpoint, params, retryPolicy)

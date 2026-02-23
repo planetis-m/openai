@@ -98,7 +98,7 @@ proc main() =
     responseFormat = formatText
   )
 
-  var client = newRelay(maxInFlight = 1, defaultTimeoutMs = 30_000)
+  let client = newRelay(maxInFlight = 1, defaultTimeoutMs = 30_000)
   defer: client.close()
 
   let item = client.makeRequest(chatRequest(cfg, params))
@@ -123,7 +123,7 @@ const ApiUrl = "https://api.openai.com/v1/chat/completions"
 
 proc main() =
   let cfg = OpenAIConfig(url: ApiUrl, apiKey: getEnv("OPENAI_API_KEY"))
-  var client = newRelay(maxInFlight = 4, defaultTimeoutMs = 30_000)
+  let client = newRelay(maxInFlight = 4, defaultTimeoutMs = 30_000)
   defer: client.close()
 
   var batch: RequestBatch
@@ -209,9 +209,11 @@ proc requestWithRetry(client: Relay; cfg: OpenAIConfig;
 
 ## Run Examples
 
+`DEEPINFRA_API_KEY` is required. Export it (for example: `set -a; source .env; set +a`).
+
 ```bash
-nim c examples/live_batch_chat_polling.nim
-nim c examples/live_ocr_retry.nim
+nim c -r examples/live_batch_chat_polling.nim
+nim c -r examples/live_ocr_retry.nim
 ```
 
 ## Run Tests

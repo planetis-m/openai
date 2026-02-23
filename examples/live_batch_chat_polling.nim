@@ -37,7 +37,7 @@ proc main() =
     apiKey: apiKey
   )
 
-  var client = newRelay(maxInFlight = 4, defaultTimeoutMs = RequestTimeoutMs, maxRedirects = 5)
+  let client = newRelay(maxInFlight = 4, defaultTimeoutMs = RequestTimeoutMs, maxRedirects = 5)
   defer: client.close()
 
   let prompts = [
