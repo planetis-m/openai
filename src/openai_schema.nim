@@ -11,7 +11,7 @@ type
     function
 
   FinishReason* = enum
-    stop, length, tool_calls, content_filter, malformed_function_call
+    unknown, stop, length, tool_calls, content_filter, malformed_function_call
 
   ImageDetail* = enum
     `auto`, low, high

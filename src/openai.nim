@@ -181,11 +181,11 @@ proc choices*(x: ChatCreateResult): int {.inline.} =
 proc hasChoiceAt(x: ChatCreateResult; i: int): bool {.inline.} =
   result = i >= 0 and i < x.choices.len
 
-proc finish*(x: ChatCreateResult; i = 0): string =
+proc finish*(x: ChatCreateResult; i = 0): FinishReason =
   if not x.hasChoiceAt(i):
-    result = ""
+    result = FinishReason.unknown
   else:
-    result = $x.choices[i].finish_reason
+    result = x.choices[i].finish_reason
 
 proc firstText*(x: ChatCreateResult; i = 0): string =
   result = ""

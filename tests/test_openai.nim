@@ -251,7 +251,7 @@ proc testResponseGettersWithTextContent() =
   doAssert idOf(parsed) == "cmpl_1"
   doAssert modelOf(parsed) == "gpt-4.1-mini"
   doAssert choices(parsed) == 1
-  doAssert finish(parsed) == "stop"
+  doAssert finish(parsed) == FinishReason.stop
   doAssert firstText(parsed) == "Hello"
   doAssert allTextParts(parsed).len == 0
   doAssert promptTokens(parsed) == 1
@@ -264,7 +264,7 @@ proc testResponseGettersWithTextContent() =
 proc testResponseGettersWithPartsAndToolCalls() =
   var parsed: ChatCreateResult
   doAssert chatParse(PartsResponse, parsed)
-  doAssert finish(parsed) == "tool_calls"
+  doAssert finish(parsed) == FinishReason.tool_calls
   doAssert firstText(parsed) == "first"
   doAssert allTextParts(parsed) == @["first", "second"]
   doAssert calls(parsed).len == 1
@@ -276,8 +276,8 @@ proc testResponseGetterDefaultsOnMissingChoice() =
   doAssert idOf(empty) == ""
   doAssert modelOf(empty) == ""
   doAssert choices(empty) == 0
-  doAssert finish(empty) == ""
-  doAssert finish(empty, i = 6) == ""
+  doAssert finish(empty) == FinishReason.unknown
+  doAssert finish(empty, i = 6) == FinishReason.unknown
   doAssert firstText(empty) == ""
   doAssert firstText(empty, i = 2) == ""
   doAssert allTextParts(empty).len == 0
