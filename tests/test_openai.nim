@@ -1,6 +1,7 @@
 import relay
 import jsonx
 import openai
+import std/strutils
 
 const GoodResponse = """{
   "id": "cmpl_1",
@@ -189,6 +190,65 @@ proc testChatCreateParamsBuilder() =
   doAssert request.tool_choice == ToolChoice.required
   doAssert request.response_format.`type` == ResponseFormatType.json_object
 
+proc testChatCreateMaxTokensSerialization() =
+  let defaultRequest = chatCreate(
+    model = "gpt-4.1-mini",
+    messages = @[userMessageText("ping")]
+  )
+  let defaultJson = toJson(defaultRequest)
+  doAssert not defaultJson.contains("\"max_tokens\":")
+  doAssert not defaultJson.contains("\"stream\":")
+  doAssert not defaultJson.contains("\"temperature\":")
+  doAssert not defaultJson.contains("\"tools\":")
+  doAssert not defaultJson.contains("\"tool_choice\":")
+  doAssert not defaultJson.contains("\"response_format\":")
+  doAssert not defaultJson.contains("\"name\":")
+  doAssert not defaultJson.contains("\"tool_call_id\":")
+
+  let explicitRequest = chatCreate(
+    model = "gpt-4.1-mini",
+    messages = @[userMessageText("ping")],
+    maxTokens = 64
+  )
+  let explicitJson = toJson(explicitRequest)
+  doAssert explicitJson.contains("\"max_tokens\":64")
+
+proc testChatCreateSerializationFieldInclusionRules() =
+  let request = chatCreate(
+    model = "gpt-4.1-mini",
+    messages = @[
+      userMessageText("ping", name = "alice"),
+      toolMessageText("result", "call_1")
+    ],
+    stream = true,
+    temperature = 0.2,
+    maxTokens = 64,
+    tools = @[
+      toolFunction("lookup", "search docs"),
+      toolFunction("extract")
+    ],
+    toolChoice = ToolChoice.required,
+    responseFormat = formatJsonObject
+  )
+  let json = toJson(request)
+  doAssert json.contains("\"stream\":true")
+  doAssert json.contains("\"temperature\":0.2")
+  doAssert json.contains("\"tool_choice\":\"required\"")
+  doAssert json.contains("\"response_format\":{\"type\":\"json_object\"}")
+  doAssert json.contains("\"name\":\"alice\"")
+  doAssert json.contains("\"tool_call_id\":\"call_1\"")
+  doAssert json.contains("\"name\":\"lookup\",\"description\":\"search docs\"")
+  doAssert not json.contains("\"name\":\"extract\",\"description\":")
+
+  let noToolsRequest = chatCreate(
+    model = "gpt-4.1-mini",
+    messages = @[userMessageText("ping")],
+    toolChoice = ToolChoice.required
+  )
+  let noToolsJson = toJson(noToolsRequest)
+  doAssert not noToolsJson.contains("\"tools\":")
+  doAssert not noToolsJson.contains("\"tool_choice\":")
+
 proc testSerializationRoundTripForBuiltRequest() =
   let request = chatCreate(
     model = "gpt-4.1-mini",
@@ -300,6 +360,8 @@ proc testHttpSuccessClassifier() =
 when isMainModule:
   testInputConstructorsCoverage()
   testChatCreateParamsBuilder()
+  testChatCreateMaxTokensSerialization()
+  testChatCreateSerializationFieldInclusionRules()
   testSerializationRoundTripForBuiltRequest()
   testChatRequest()
   testStreamingFlagPassesThrough()

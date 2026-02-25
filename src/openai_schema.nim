@@ -161,3 +161,47 @@ proc writeJson*(s: Stream; x: ChatCompletionMessageContent) =
     writeJson(s, x.text)
   of parts:
     writeJson(s, x.parts)
+
+template writeJsonField(s: Stream; name: string; value: untyped) =
+  if comma: streams.write(s, ",")
+  else: comma = true
+  escapeJson(s, name)
+  streams.write(s, ":")
+  writeJson(s, value)
+
+proc writeJson*(s: Stream; x: FunctionDefinition) =
+  var comma = false
+  streams.write(s, "{")
+  writeJsonField(s, "name", x.name)
+  if x.description.len > 0:
+    writeJsonField(s, "description", x.description)
+  streams.write(s, "}")
+
+proc writeJson*(s: Stream; x: ChatMessage) =
+  var comma = false
+  streams.write(s, "{")
+  writeJsonField(s, "role", x.role)
+  writeJsonField(s, "content", x.content)
+  if x.name.len > 0:
+    writeJsonField(s, "name", x.name)
+  if x.role == ChatMessageRole.tool and x.tool_call_id.len > 0:
+    writeJsonField(s, "tool_call_id", x.tool_call_id)
+  streams.write(s, "}")
+
+proc writeJson*(s: Stream; x: OpenAIChatCompletionsIn) =
+  var comma = false
+  streams.write(s, "{")
+  writeJsonField(s, "model", x.model)
+  writeJsonField(s, "messages", x.messages)
+  if x.stream:
+    writeJsonField(s, "stream", x.stream)
+  if x.temperature != 1.0:
+    writeJsonField(s, "temperature", x.temperature)
+  if x.max_tokens != 0:
+    writeJsonField(s, "max_tokens", x.max_tokens)
+  if x.tools.len > 0:
+    writeJsonField(s, "tools", x.tools)
+    writeJsonField(s, "tool_choice", x.tool_choice)
+  if x.response_format.`type` != ResponseFormatType.text:
+    writeJsonField(s, "response_format", x.response_format)
+  streams.write(s, "}")
