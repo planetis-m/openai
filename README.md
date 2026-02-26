@@ -168,6 +168,73 @@ let params = chatCreate(
 )
 ```
 
+## Schema-First Tool Calling + Structured Output
+
+Both helpers accept typed Nim schema objects and serialize with `toJson`
+internally. This keeps tool arguments and final assistant output locked to
+shapes you control.
+
+```nim
+type
+  SchemaProp = object
+    `type`: string
+    description: string
+
+  WeatherToolSchema = object
+    `type`: string
+    properties: tuple[
+      city: SchemaProp,
+      unit: SchemaProp
+    ]
+    required: seq[string]
+    additionalProperties: bool
+
+  WeatherAnswerSchema = object
+    `type`: string
+    properties: tuple[
+      summary: SchemaProp,
+      celsius: SchemaProp,
+      advice: SchemaProp
+    ]
+    required: seq[string]
+    additionalProperties: bool
+
+let params = chatCreate(
+  model = "gpt-4.1-mini",
+  messages = @[userMessageText("What's the weather in Berlin and what should I wear?")],
+  tools = @[
+    toolFunction(
+      "get_weather",
+      "Look up current weather for a city",
+      WeatherToolSchema(
+        `type`: "object",
+        properties: (
+          city: SchemaProp(`type`: "string", description: "City name"),
+          unit: SchemaProp(`type`: "string", description: "celsius or fahrenheit")
+        ),
+        required: @["city"],
+        additionalProperties: false
+      )
+    )
+  ],
+  toolChoice = ToolChoice.required,
+  responseFormat = formatJsonSchema(
+    "weather_answer",
+    WeatherAnswerSchema(
+      `type`: "object",
+      properties: (
+        summary: SchemaProp(`type`: "string", description: "One-line weather summary"),
+        celsius: SchemaProp(`type`: "number", description: "Current temperature in C"),
+        advice: SchemaProp(`type`: "string", description: "Simple clothing advice")
+      ),
+      required: @["summary", "celsius", "advice"],
+      additionalProperties: false
+    ),
+    strict = true
+  )
+)
+```
+
 ## Optional Retry Module
 
 `openai_retry` is optional.
@@ -200,7 +267,8 @@ proc requestWithRetry(client: Relay; cfg: OpenAIConfig;
 - Message/content helpers:
   `systemMessageText`, `userMessageText`, `assistantMessageText`,
   `toolMessageText`, `userMessageParts`, `partText`, `partImageUrl`,
-  `partInputAudio`, `contentText`, `contentParts`, `toolFunction`
+  `partInputAudio`, `contentText`, `contentParts`, `toolFunction`,
+  `toolFunction(name, description, parametersSchema)`
 - Response formats:
   `formatText`, `formatJsonObject`, `formatJsonSchema(name, schema, strict=true)`, `formatRegex`
 - Response accessors:

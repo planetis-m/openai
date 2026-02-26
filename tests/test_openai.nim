@@ -261,6 +261,25 @@ proc testChatCreateSerializationFieldInclusionRules() =
   doAssert not noToolsJson.contains("\"tools\":")
   doAssert not noToolsJson.contains("\"tool_choice\":")
 
+  let toolsDefaultChoiceRequest = chatCreate(
+    model = "gpt-4.1-mini",
+    messages = @[userMessageText("ping")],
+    tools = @[toolFunction("lookup")]
+  )
+  let toolsDefaultChoiceJson = toJson(toolsDefaultChoiceRequest)
+  doAssert toolsDefaultChoiceJson.contains("\"tools\":[")
+  doAssert not toolsDefaultChoiceJson.contains("\"tool_choice\":")
+
+  let toolsAutoChoiceRequest = chatCreate(
+    model = "gpt-4.1-mini",
+    messages = @[userMessageText("ping")],
+    tools = @[toolFunction("lookup")],
+    toolChoice = ToolChoice.auto
+  )
+  let toolsAutoChoiceJson = toJson(toolsAutoChoiceRequest)
+  doAssert toolsAutoChoiceJson.contains("\"tools\":[")
+  doAssert not toolsAutoChoiceJson.contains("\"tool_choice\":")
+
 proc testAssistantToolCallMessageSerialization() =
   let toolCall = ChatCompletionMessageToolCall(
     id: "call_1",

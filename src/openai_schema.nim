@@ -254,7 +254,8 @@ proc writeJson*(s: Stream; x: OpenAIChatCompletionsIn) =
     writeJsonField(s, "max_tokens", x.max_tokens)
   if x.tools.len > 0:
     writeJsonField(s, "tools", x.tools)
-    writeJsonField(s, "tool_choice", x.tool_choice)
+    if x.tool_choice == ToolChoice.required:
+      writeJsonField(s, "tool_choice", x.tool_choice)
   if x.response_format.`type` != ResponseFormatType.text:
     writeJsonField(s, "response_format", x.response_format)
   streams.write(s, "}")
