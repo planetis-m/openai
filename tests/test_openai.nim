@@ -57,6 +57,43 @@ const PartsResponse = """{
   }
 }"""
 
+const JsonTextResponse = """{
+  "id": "cmpl_json",
+  "model": "gpt-4.1-mini",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "tool_calls": [],
+        "content": "{\"city\":\"Seattle\",\"temperatureC\":9.0,\"condition\":\"light rain\",\"advice\":\"Wear a jacket.\"}"
+      },
+      "finish_reason": "stop"
+    },
+    {
+      "index": 1,
+      "message": {
+        "role": "assistant",
+        "tool_calls": [],
+        "content": "not json"
+      },
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 12,
+    "completion_tokens": 15,
+    "total_tokens": 27
+  }
+}"""
+
+type
+  ParsedWeatherAnswer = object
+    city: string
+    temperatureC: float
+    condition: string
+    advice: string
+
 proc sampleParams(streamValue = false): ChatCreateParams =
   chatCreate(
     model = "gpt-4.1-mini",
@@ -150,12 +187,33 @@ proc testInputConstructorsCoverage() =
   doAssert mAssistant.content.kind == ChatCompletionInputContentKind.text
   doAssert mAssistant.content.text == "draft"
 
+  let toolCall = ChatCompletionMessageToolCall(
+    id: "call_1",
+    `type`: ChatToolType.function,
+    function: FunctionCall(
+      name: "lookup",
+      arguments: "{\"q\":\"nim\"}"
+    )
+  )
+  let mAssistantCalls = assistantMessageToolCalls(@[toolCall])
+  doAssert mAssistantCalls.role == ChatMessageRole.assistant
+  doAssert mAssistantCalls.tool_calls.len == 1
+  doAssert mAssistantCalls.tool_calls[0].id == "call_1"
+
   let mTool = toolMessageText("result-json", "call_99", name = "tool-name")
   doAssert mTool.role == ChatMessageRole.tool
   doAssert mTool.content.kind == ChatCompletionInputContentKind.text
   doAssert mTool.content.text == "result-json"
   doAssert mTool.tool_call_id == "call_99"
   doAssert mTool.name == "tool-name"
+
+  let mToolJson = toolMessageJson((city: "Berlin", celsius: 3.5), "call_100",
+    name = "weather")
+  doAssert mToolJson.role == ChatMessageRole.tool
+  doAssert mToolJson.content.kind == ChatCompletionInputContentKind.text
+  doAssert mToolJson.content.text == """{"city":"Berlin","celsius":3.5}"""
+  doAssert mToolJson.tool_call_id == "call_100"
+  doAssert mToolJson.name == "weather"
 
   let tool = toolFunction("lookup", "search docs")
   doAssert tool.`type` == ChatToolType.function
@@ -293,10 +351,7 @@ proc testAssistantToolCallMessageSerialization() =
   let toolCallOnlyRequest = chatCreate(
     model = "gpt-4.1-mini",
     messages = @[
-      ChatMessage(
-        role: ChatMessageRole.assistant,
-        tool_calls: @[toolCall]
-      )
+      assistantMessageToolCalls(@[toolCall])
     ],
     tools = @[toolFunction("lookup")]
   )
@@ -387,6 +442,8 @@ proc testResponseGettersWithTextContent() =
   doAssert completionTokens(parsed) == 2
   doAssert totalTokens(parsed) == 3
   doAssert calls(parsed).len == 0
+  doAssert not hasToolCalls(parsed)
+  doAssert firstCallId(parsed) == ""
   doAssert firstCallName(parsed) == ""
   doAssert firstCallArgs(parsed) == ""
 
@@ -397,6 +454,8 @@ proc testResponseGettersWithPartsAndToolCalls() =
   doAssert firstText(parsed) == "first"
   doAssert allTextParts(parsed) == @["first", "second"]
   doAssert calls(parsed).len == 1
+  doAssert hasToolCalls(parsed)
+  doAssert firstCallId(parsed) == "call_1"
   doAssert firstCallName(parsed) == "lookup"
   doAssert firstCallArgs(parsed) == "{\"q\":\"nim\"}"
 
@@ -411,11 +470,32 @@ proc testResponseGetterDefaultsOnMissingChoice() =
   doAssert firstText(empty, i = 2) == ""
   doAssert allTextParts(empty).len == 0
   doAssert calls(empty).len == 0
+  doAssert not hasToolCalls(empty)
+  doAssert not hasToolCalls(empty, i = 2)
+  doAssert firstCallId(empty) == ""
   doAssert firstCallName(empty) == ""
   doAssert firstCallArgs(empty) == ""
   doAssert promptTokens(empty) == 0
   doAssert completionTokens(empty) == 0
   doAssert totalTokens(empty) == 0
+
+proc testParseFirstTextJson() =
+  var parsed: ChatCreateResult
+  doAssert chatParse(JsonTextResponse, parsed)
+
+  var answer: ParsedWeatherAnswer
+  doAssert parseFirstTextJson(parsed, answer)
+  doAssert answer.city == "Seattle"
+  doAssert answer.temperatureC == 9.0
+  doAssert answer.condition == "light rain"
+  doAssert answer.advice == "Wear a jacket."
+
+  doAssert not parseFirstTextJson(parsed, answer, i = 1)
+  doAssert not parseFirstTextJson(parsed, answer, i = 3)
+
+  var textOnly: ChatCreateResult
+  doAssert chatParse(GoodResponse, textOnly)
+  doAssert not parseFirstTextJson(textOnly, answer)
 
 proc testHttpSuccessClassifier() =
   doAssert isHttpSuccess(200)
@@ -440,5 +520,6 @@ when isMainModule:
   testResponseGettersWithTextContent()
   testResponseGettersWithPartsAndToolCalls()
   testResponseGetterDefaultsOnMissingChoice()
+  testParseFirstTextJson()
   testHttpSuccessClassifier()
   echo "all tests passed"

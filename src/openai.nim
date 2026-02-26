@@ -81,6 +81,12 @@ proc assistantMessageText*(text: sink string; name: sink string = ""): ChatMessa
     name: name
   )
 
+proc assistantMessageToolCalls*(toolCalls: sink seq[ChatCompletionMessageToolCall]): ChatMessage =
+  ChatMessage(
+    role: ChatMessageRole.assistant,
+    tool_calls: toolCalls
+  )
+
 proc toolMessageText*(text, toolCallId: sink string; name: sink string = ""): ChatMessage =
   ChatMessage(
     role: ChatMessageRole.tool,
@@ -88,6 +94,10 @@ proc toolMessageText*(text, toolCallId: sink string; name: sink string = ""): Ch
     name: name,
     tool_call_id: toolCallId
   )
+
+proc toolMessageJson*[T](value: T; toolCallId: sink string;
+    name: sink string = ""): ChatMessage =
+  result = toolMessageText(toJson(value), toolCallId, name)
 
 proc toolFunction*(name: sink string; description: sink string = ""): ChatTool =
   ChatTool(
@@ -233,6 +243,16 @@ proc firstText*(x: ChatCreateResult; i = 0): string =
         if result.len == 0 and part.text.len > 0:
           return part.text
 
+proc parseFirstTextJson*[T](x: ChatCreateResult; dst: var T; i = 0): bool =
+  result = false
+  let text = x.firstText(i)
+  if text.len > 0:
+    try:
+      dst = fromJson(text, T)
+      result = true
+    except CatchableError:
+      result = false
+
 proc allTextParts*(x: ChatCreateResult; i = 0): seq[string] =
   result = @[]
   if x.hasChoiceAt(i):
@@ -246,14 +266,22 @@ proc calls*(x: ChatCreateResult; i = 0): seq[ChatCompletionMessageToolCall] =
   if x.hasChoiceAt(i):
     result = x.choices[i].message.tool_calls
 
-proc firstCallName*(x: ChatCreateResult; i = 0): string =
-  let callList = x.calls(i)
+proc hasToolCalls*(x: ChatCreateResult; i = 0): bool =
+  result = false
+  if x.hasChoiceAt(i):
+    result = x.choices[i].message.tool_calls.len > 0
+
+proc firstCallId*(x: ChatCreateResult; i = 0): string =
   result = ""
-  if callList.len > 0:
-    result = callList[0].function.name
+  if x.hasToolCalls(i):
+    result = x.choices[i].message.tool_calls[0].id
+
+proc firstCallName*(x: ChatCreateResult; i = 0): string =
+  result = ""
+  if x.hasToolCalls(i):
+    result = x.choices[i].message.tool_calls[0].function.name
 
 proc firstCallArgs*(x: ChatCreateResult; i = 0): string =
-  let callList = x.calls(i)
   result = ""
-  if callList.len > 0:
-    result = callList[0].function.arguments
+  if x.hasToolCalls(i):
+    result = x.choices[i].message.tool_calls[0].function.arguments

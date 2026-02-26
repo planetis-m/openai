@@ -44,21 +44,15 @@ type
     condition: string
     advice: string
 
-template firstToolCalls(x: ChatCreateResult): untyped =
-  x.choices[0].message.tool_calls
-
-template firstToolCall(x: ChatCreateResult): untyped =
-  x.choices[0].message.tool_calls[0]
-
-proc makeWeatherToolResult(args: WeatherToolArgs): string =
+proc makeWeatherToolResult(args: WeatherToolArgs): WeatherToolResult =
   let celsius = 9.0
-  result = toJson(WeatherToolResult(
+  result = WeatherToolResult(
     city: args.city,
     temperatureC: celsius,
     condition: "light rain",
     windKph: 14.0,
     humidityPct: 82
-  ))
+  )
 
 proc requestChat(client: Relay; endpoint: OpenAIConfig; params: ChatCreateParams;
     requestId: int64): ChatCreateResult =
@@ -124,38 +118,34 @@ proc main() =
     responseFormat = formatText
   )
   let firstTurn = requestChat(client, endpoint, params, requestId = 1)
-  assert firstTurn.choices.len > 0, "No choices in first response."
-  assert firstTurn.firstToolCalls.len > 0, firstText(firstTurn)
+  assert hasToolCalls(firstTurn), firstText(firstTurn)
 
   # Run local tool code with model-provided arguments.
-  let toolArgs = fromJson(
-    firstTurn.firstToolCall.function.arguments,
-    WeatherToolArgs
-  )
+  let toolArgs = fromJson(firstCallArgs(firstTurn), WeatherToolArgs)
   let toolResult = makeWeatherToolResult(toolArgs)
-  echo "tool=", firstTurn.firstToolCall.function.name
-  echo "args=", firstTurn.firstToolCall.function.arguments
-  echo "toolResult=", toolResult
+  echo "\n[Tool Execution]",
+    "\n  Tool:        ", firstCallName(firstTurn),
+    "\n  Arguments:   ", firstCallArgs(firstTurn),
+    "\n  Result:      ", toJson(toolResult)
 
   # Turn 2: continue the same conversation with tool call + tool result.
-  params.messages.add(ChatMessage(
-    role: ChatMessageRole.assistant,
-    tool_calls: firstTurn.firstToolCalls
-  ))
-  params.messages.add(toolMessageText(
+  params.messages.add(assistantMessageToolCalls(calls(firstTurn)))
+  params.messages.add(toolMessageJson(
     toolResult,
-    firstTurn.firstToolCall.id,
-    name = firstTurn.firstToolCall.function.name
+    firstCallId(firstTurn),
+    name = firstCallName(firstTurn)
   ))
   params.tool_choice = ToolChoice.none
   params.response_format = weatherAnswerFormat
   let secondTurn = requestChat(client, endpoint, params, requestId = 2)
-  let answer = fromJson(firstText(secondTurn), WeatherAnswer)
-  echo "model=", modelOf(secondTurn)
-  echo "city=", answer.city
-  echo "temperatureC=", answer.temperatureC
-  echo "condition=", answer.condition
-  echo "advice=", answer.advice
+  var answer: WeatherAnswer
+  assert parseFirstTextJson(secondTurn, answer), firstText(secondTurn)
+  echo "\n[Weather Information]",
+    "\n  Model:       ", modelOf(secondTurn),
+    "\n  City:        ", answer.city,
+    "\n  Temperature: ", answer.temperatureC, "°C",
+    "\n  Condition:   ", answer.condition,
+    "\n  Advice:      ", answer.advice
 
 when isMainModule:
   main()
