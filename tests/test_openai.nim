@@ -261,6 +261,45 @@ proc testChatCreateSerializationFieldInclusionRules() =
   doAssert not noToolsJson.contains("\"tools\":")
   doAssert not noToolsJson.contains("\"tool_choice\":")
 
+proc testAssistantToolCallMessageSerialization() =
+  let toolCall = ChatCompletionMessageToolCall(
+    id: "call_1",
+    `type`: ChatToolType.function,
+    function: FunctionCall(
+      name: "lookup",
+      arguments: "{\"q\":\"nim\"}"
+    )
+  )
+
+  let toolCallOnlyRequest = chatCreate(
+    model = "gpt-4.1-mini",
+    messages = @[
+      ChatMessage(
+        role: ChatMessageRole.assistant,
+        tool_calls: @[toolCall]
+      )
+    ],
+    tools = @[toolFunction("lookup")]
+  )
+  let toolCallOnlyJson = toJson(toolCallOnlyRequest)
+  doAssert toolCallOnlyJson.contains("\"tool_calls\":[{")
+  doAssert not toolCallOnlyJson.contains("\"content\":")
+
+  let toolCallWithContentRequest = chatCreate(
+    model = "gpt-4.1-mini",
+    messages = @[
+      ChatMessage(
+        role: ChatMessageRole.assistant,
+        content: contentText("Looking this up"),
+        tool_calls: @[toolCall]
+      )
+    ],
+    tools = @[toolFunction("lookup")]
+  )
+  let toolCallWithContentJson = toJson(toolCallWithContentRequest)
+  doAssert toolCallWithContentJson.contains("\"tool_calls\":[{")
+  doAssert toolCallWithContentJson.contains("\"content\":\"Looking this up\"")
+
 proc testSerializationRoundTripForBuiltRequest() =
   let request = chatCreate(
     model = "gpt-4.1-mini",
@@ -373,6 +412,7 @@ when isMainModule:
   testChatCreateParamsBuilder()
   testChatCreateMaxTokensSerialization()
   testChatCreateSerializationFieldInclusionRules()
+  testAssistantToolCallMessageSerialization()
   testSerializationRoundTripForBuiltRequest()
   testChatRequest()
   testStreamingFlagPassesThrough()

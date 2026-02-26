@@ -122,6 +122,7 @@ type
   ChatMessage* = object
     role*: ChatMessageRole
     content*: ChatCompletionMessageContent
+    tool_calls*: seq[ChatCompletionMessageToolCall]
     name*: string
     tool_call_id*: string
 
@@ -172,6 +173,13 @@ proc writeJson*(s: Stream; x: ChatCompletionMessageContent) =
   of parts:
     writeJson(s, x.parts)
 
+proc hasMessageContent(x: ChatMessage): bool =
+  case x.content.kind
+  of text:
+    result = x.content.text.len > 0
+  of parts:
+    result = x.content.parts.len > 0
+
 template writeJsonField(s: Stream; name: string; value: untyped) =
   if comma: streams.write(s, ",")
   else: comma = true
@@ -221,7 +229,12 @@ proc writeJson*(s: Stream; x: ChatMessage) =
   var comma = false
   streams.write(s, "{")
   writeJsonField(s, "role", x.role)
-  writeJsonField(s, "content", x.content)
+  if x.tool_calls.len > 0:
+    writeJsonField(s, "tool_calls", x.tool_calls)
+  let omitAssistantContent = x.role == ChatMessageRole.assistant and
+    x.tool_calls.len > 0 and not x.hasMessageContent()
+  if not omitAssistantContent:
+    writeJsonField(s, "content", x.content)
   if x.name.len > 0:
     writeJsonField(s, "name", x.name)
   if x.role == ChatMessageRole.tool and x.tool_call_id.len > 0:
