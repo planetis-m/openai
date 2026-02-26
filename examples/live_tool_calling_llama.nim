@@ -1,7 +1,5 @@
 import std/os
-import jsonx
-import relay
-import openai
+import jsonx, relay, openai
 
 {.passL: "-lcurl".}
 
@@ -28,6 +26,29 @@ type
     condition: string
     windKph: float
     humidityPct: int
+
+  WeatherAnswerSchema = object
+    `type`: string
+    properties: tuple[
+      city: SchemaProp,
+      temperatureC: SchemaProp,
+      condition: SchemaProp,
+      advice: SchemaProp
+    ]
+    required: seq[string]
+    additionalProperties: bool
+
+  WeatherAnswer = object
+    city: string
+    temperatureC: float
+    condition: string
+    advice: string
+
+template firstToolCalls(x: ChatCreateResult): untyped =
+  x.choices[0].message.tool_calls
+
+template firstToolCall(x: ChatCreateResult): untyped =
+  x.choices[0].message.tool_calls[0]
 
 proc makeWeatherToolResult(args: WeatherToolArgs): string =
   let celsius = 9.0
@@ -67,6 +88,21 @@ proc main() =
       additionalProperties: false
     )
   )
+  let weatherAnswerFormat = formatJsonSchema(
+    "weather_answer",
+    WeatherAnswerSchema(
+      `type`: "object",
+      properties: (
+        city: SchemaProp(`type`: "string", description: "City name"),
+        temperatureC: SchemaProp(`type`: "number", description: "Temperature in Celsius"),
+        condition: SchemaProp(`type`: "string", description: "Weather condition"),
+        advice: SchemaProp(`type`: "string", description: "What to wear")
+      ),
+      required: @["city", "temperatureC", "condition", "advice"],
+      additionalProperties: false
+    ),
+    strict = true
+  )
   let endpoint = OpenAIConfig(
     url: "https://api.deepinfra.com/v1/openai/chat/completions",
     apiKey: apiKey
@@ -76,7 +112,7 @@ proc main() =
 
   # Turn 1: force a tool call.
   var params = chatCreate(
-    model = "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+    model = "Qwen/Qwen3-235B-A22B-Instruct-2507",
     messages = @[
       systemMessageText("You are concise. Use the weather tool before answering weather questions."),
       userMessageText("What is the weather in Seattle today and what should I wear?")
@@ -88,27 +124,38 @@ proc main() =
     responseFormat = formatText
   )
   let firstTurn = requestChat(client, endpoint, params, requestId = 1)
-  let toolCalls = calls(firstTurn)
-  assert toolCalls.len > 0, firstText(firstTurn)
+  assert firstTurn.choices.len > 0, "No choices in first response."
+  assert firstTurn.firstToolCalls.len > 0, firstText(firstTurn)
 
   # Run local tool code with model-provided arguments.
-  let firstCall = toolCalls[0]
-  let toolArgs = fromJson(firstCall.function.arguments, WeatherToolArgs)
+  let toolArgs = fromJson(
+    firstTurn.firstToolCall.function.arguments,
+    WeatherToolArgs
+  )
   let toolResult = makeWeatherToolResult(toolArgs)
-  echo "tool=", firstCall.function.name
-  echo "args=", firstCall.function.arguments
+  echo "tool=", firstTurn.firstToolCall.function.name
+  echo "args=", firstTurn.firstToolCall.function.arguments
   echo "toolResult=", toolResult
 
   # Turn 2: continue the same conversation with tool call + tool result.
   params.messages.add(ChatMessage(
     role: ChatMessageRole.assistant,
-    tool_calls: toolCalls
+    tool_calls: firstTurn.firstToolCalls
   ))
-  params.messages.add(toolMessageText(toolResult, firstCall.id, name = firstCall.function.name))
+  params.messages.add(toolMessageText(
+    toolResult,
+    firstTurn.firstToolCall.id,
+    name = firstTurn.firstToolCall.function.name
+  ))
   params.tool_choice = ToolChoice.none
+  params.response_format = weatherAnswerFormat
   let secondTurn = requestChat(client, endpoint, params, requestId = 2)
-  echo firstText(secondTurn)
+  let answer = fromJson(firstText(secondTurn), WeatherAnswer)
   echo "model=", modelOf(secondTurn)
+  echo "city=", answer.city
+  echo "temperatureC=", answer.temperatureC
+  echo "condition=", answer.condition
+  echo "advice=", answer.advice
 
 when isMainModule:
   main()
