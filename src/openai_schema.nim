@@ -104,13 +104,20 @@ type
   FunctionDefinition* = object
     name*: string
     description*: string
+    parameters*: string
 
   ChatTool* = object
     `type`*: ChatToolType
     function*: FunctionDefinition
 
+  ResponseFormatJsonSchema* = object
+    name*: string
+    schema*: string
+    strict*: bool
+
   ResponseFormat* = object
     `type`*: ResponseFormatType
+    json_schema*: ResponseFormatJsonSchema
 
   ChatMessage* = object
     role*: ChatMessageRole
@@ -127,6 +134,9 @@ type
     tools*: seq[ChatTool]
     tool_choice*: ToolChoice
     response_format*: ResponseFormat
+
+const
+  EmptyFunctionParametersSchema* = """{"type":"object","properties":{}}"""
 
 proc readJson*(dst: var ChatCompletionAssistantContent; p: var JsonParser) =
   if p.tok == tkString:
@@ -169,12 +179,42 @@ template writeJsonField(s: Stream; name: string; value: untyped) =
   streams.write(s, ":")
   writeJson(s, value)
 
+template writeJsonRawField(s: Stream; name: string; value: string) =
+  if comma: streams.write(s, ",")
+  else: comma = true
+  escapeJson(s, name)
+  streams.write(s, ":")
+  streams.write(s, value)
+
 proc writeJson*(s: Stream; x: FunctionDefinition) =
   var comma = false
   streams.write(s, "{")
   writeJsonField(s, "name", x.name)
   if x.description.len > 0:
     writeJsonField(s, "description", x.description)
+  if x.parameters.len > 0:
+    writeJsonRawField(s, "parameters", x.parameters)
+  else:
+    writeJsonRawField(s, "parameters", EmptyFunctionParametersSchema)
+  streams.write(s, "}")
+
+proc writeJson*(s: Stream; x: ResponseFormatJsonSchema) =
+  var comma = false
+  streams.write(s, "{")
+  writeJsonField(s, "name", x.name)
+  if x.schema.len > 0:
+    writeJsonRawField(s, "schema", x.schema)
+  else:
+    writeJsonRawField(s, "schema", "{}")
+  writeJsonField(s, "strict", x.strict)
+  streams.write(s, "}")
+
+proc writeJson*(s: Stream; x: ResponseFormat) =
+  var comma = false
+  streams.write(s, "{")
+  writeJsonField(s, "type", x.`type`)
+  if x.`type` == ResponseFormatType.json_schema:
+    writeJsonField(s, "json_schema", x.json_schema)
   streams.write(s, "}")
 
 proc writeJson*(s: Stream; x: ChatMessage) =

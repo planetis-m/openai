@@ -94,15 +94,49 @@ proc toolFunction*(name: sink string; description: sink string = ""): ChatTool =
     `type`: ChatToolType.function,
     function: FunctionDefinition(
       name: name,
-      description: description
+      description: description,
+      parameters: EmptyFunctionParametersSchema
     )
   )
+
+proc toolFunction*(name: sink string; description: sink string;
+    parameters: sink string): ChatTool =
+  ChatTool(
+    `type`: ChatToolType.function,
+    function: FunctionDefinition(
+      name: name,
+      description: description,
+      parameters: parameters
+    )
+  )
+
+proc toolFunction*[TSchema](name: sink string; description: sink string;
+    parametersSchema: TSchema): ChatTool =
+  result = toolFunction(name, description, toJson(parametersSchema))
+
+proc toolFunction*[TSchema](name: sink string;
+    parametersSchema: TSchema): ChatTool =
+  result = toolFunction(name, "", toJson(parametersSchema))
 
 let
   formatText* = ResponseFormat(`type`: ResponseFormatType.text)
   formatJsonObject* = ResponseFormat(`type`: ResponseFormatType.json_object)
-  formatJsonSchema* = ResponseFormat(`type`: ResponseFormatType.json_schema)
   formatRegex* = ResponseFormat(`type`: ResponseFormatType.regex)
+
+proc formatJsonSchema*(name: sink string; schema: sink string;
+    strict = true): ResponseFormat =
+  ResponseFormat(
+    `type`: ResponseFormatType.json_schema,
+    json_schema: ResponseFormatJsonSchema(
+      name: name,
+      schema: schema,
+      strict: strict
+    )
+  )
+
+proc formatJsonSchema*[TSchema](name: sink string; schema: TSchema;
+    strict = true): ResponseFormat =
+  result = formatJsonSchema(name, toJson(schema), strict)
 
 proc chatCreate*(model: sink string; messages: sink seq[ChatMessage];
     stream = false; temperature = 1.0; maxTokens = 0;

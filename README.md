@@ -202,7 +202,7 @@ proc requestWithRetry(client: Relay; cfg: OpenAIConfig;
   `toolMessageText`, `userMessageParts`, `partText`, `partImageUrl`,
   `partInputAudio`, `contentText`, `contentParts`, `toolFunction`
 - Response formats:
-  `formatText`, `formatJsonObject`, `formatJsonSchema`, `formatRegex`
+  `formatText`, `formatJsonObject`, `formatJsonSchema(name, schema, strict=true)`, `formatRegex`
 - Response accessors:
   `idOf`, `modelOf`, `choices`, `finish`, `firstText`, `allTextParts`,
   `calls`, `firstCallName`, `firstCallArgs`, `promptTokens`,

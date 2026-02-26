@@ -161,10 +161,22 @@ proc testInputConstructorsCoverage() =
   doAssert tool.`type` == ChatToolType.function
   doAssert tool.function.name == "lookup"
   doAssert tool.function.description == "search docs"
+  doAssert tool.function.parameters == EmptyFunctionParametersSchema
+
+  type
+    ToolSchema = object
+      `type`: string
+
+  let typedTool = toolFunction("typed", ToolSchema(`type`: "object"))
+  doAssert typedTool.function.parameters == """{"type":"object"}"""
 
   doAssert formatText.`type` == ResponseFormatType.text
   doAssert formatJsonObject.`type` == ResponseFormatType.json_object
-  doAssert formatJsonSchema.`type` == ResponseFormatType.json_schema
+  let jsonSchemaFormat = formatJsonSchema("output", """{"type":"object"}""")
+  doAssert jsonSchemaFormat.`type` == ResponseFormatType.json_schema
+  doAssert jsonSchemaFormat.json_schema.name == "output"
+  doAssert jsonSchemaFormat.json_schema.schema == """{"type":"object"}"""
+  doAssert jsonSchemaFormat.json_schema.strict
   doAssert formatRegex.`type` == ResponseFormatType.regex
 
 proc testChatCreateParamsBuilder() =
@@ -237,7 +249,7 @@ proc testChatCreateSerializationFieldInclusionRules() =
   doAssert json.contains("\"response_format\":{\"type\":\"json_object\"}")
   doAssert json.contains("\"name\":\"alice\"")
   doAssert json.contains("\"tool_call_id\":\"call_1\"")
-  doAssert json.contains("\"name\":\"lookup\",\"description\":\"search docs\"")
+  doAssert json.contains("\"name\":\"lookup\",\"description\":\"search docs\",\"parameters\":{\"type\":\"object\",\"properties\":{}}")
   doAssert not json.contains("\"name\":\"extract\",\"description\":")
 
   let noToolsRequest = chatCreate(
@@ -260,7 +272,6 @@ proc testSerializationRoundTripForBuiltRequest() =
       ])
     ],
     maxTokens = 128,
-    tools = @[toolFunction("extract")],
     responseFormat = formatText
   )
   let serialized = toJson(request)
