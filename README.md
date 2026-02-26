@@ -287,6 +287,7 @@ proc requestWithRetry(client: Relay; cfg: OpenAIConfig;
 ```bash
 nim c -r examples/live_batch_chat_polling.nim
 nim c -r examples/live_ocr_retry.nim
+nim c -r examples/live_tool_calling_llama.nim
 ```
 
 ## Run Tests
