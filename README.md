@@ -170,9 +170,8 @@ let params = chatCreate(
 
 ## Schema-First Tool Calling + Structured Output
 
-Both helpers accept typed Nim schema objects and serialize with `toJson`
-internally. This keeps tool arguments and final assistant output locked to
-shapes you control.
+Define the shape once and get predictable results end-to-end: clean tool calls
+in, clean structured answers out.
 
 ```nim
 type
@@ -199,39 +198,41 @@ type
     required: seq[string]
     additionalProperties: bool
 
+let weatherTool = toolFunction(
+  "get_weather",
+  "Look up current weather for a city",
+  WeatherToolSchema(
+    `type`: "object",
+    properties: (
+      city: SchemaProp(`type`: "string", description: "City name"),
+      unit: SchemaProp(`type`: "string", description: "celsius or fahrenheit")
+    ),
+    required: @["city"],
+    additionalProperties: false
+  )
+)
+
+let weatherOutput = formatJsonSchema(
+  "weather_answer",
+  WeatherAnswerSchema(
+    `type`: "object",
+    properties: (
+      summary: SchemaProp(`type`: "string", description: "One-line weather summary"),
+      celsius: SchemaProp(`type`: "number", description: "Current temperature in C"),
+      advice: SchemaProp(`type`: "string", description: "Simple clothing advice")
+    ),
+    required: @["summary", "celsius", "advice"],
+    additionalProperties: false
+  ),
+  strict = true
+)
+
 let params = chatCreate(
   model = "gpt-4.1-mini",
   messages = @[userMessageText("What's the weather in Berlin and what should I wear?")],
-  tools = @[
-    toolFunction(
-      "get_weather",
-      "Look up current weather for a city",
-      WeatherToolSchema(
-        `type`: "object",
-        properties: (
-          city: SchemaProp(`type`: "string", description: "City name"),
-          unit: SchemaProp(`type`: "string", description: "celsius or fahrenheit")
-        ),
-        required: @["city"],
-        additionalProperties: false
-      )
-    )
-  ],
+  tools = @[weatherTool],
   toolChoice = ToolChoice.required,
-  responseFormat = formatJsonSchema(
-    "weather_answer",
-    WeatherAnswerSchema(
-      `type`: "object",
-      properties: (
-        summary: SchemaProp(`type`: "string", description: "One-line weather summary"),
-        celsius: SchemaProp(`type`: "number", description: "Current temperature in C"),
-        advice: SchemaProp(`type`: "string", description: "Simple clothing advice")
-      ),
-      required: @["summary", "celsius", "advice"],
-      additionalProperties: false
-    ),
-    strict = true
-  )
+  responseFormat = weatherOutput
 )
 ```
 
