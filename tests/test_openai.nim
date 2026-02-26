@@ -97,6 +97,14 @@ type
   ParsedToolArgs = object
     q: string
 
+template expectValueError(body: untyped) =
+  var raised = false
+  try:
+    discard body
+  except ValueError:
+    raised = true
+  doAssert raised
+
 proc sampleParams(streamValue = false): ChatCreateParams =
   chatCreate(
     model = "gpt-4.1-mini",
@@ -446,9 +454,9 @@ proc testResponseGettersWithTextContent() =
   doAssert totalTokens(parsed) == 3
   doAssert calls(parsed).len == 0
   doAssert not hasToolCalls(parsed)
-  doAssert firstCallId(parsed) == ""
-  doAssert firstCallName(parsed) == ""
-  doAssert firstCallArgs(parsed) == ""
+  expectValueError(firstCallId(parsed))
+  expectValueError(firstCallName(parsed))
+  expectValueError(firstCallArgs(parsed))
 
 proc testResponseGettersWithPartsAndToolCalls() =
   var parsed: ChatCreateResult
@@ -462,25 +470,63 @@ proc testResponseGettersWithPartsAndToolCalls() =
   doAssert firstCallName(parsed) == "lookup"
   doAssert firstCallArgs(parsed) == "{\"q\":\"nim\"}"
 
-proc testResponseGetterDefaultsOnMissingChoice() =
+proc testResponseAccessorsRaiseOnMissingChoice() =
   let empty = ChatCreateResult()
   doAssert idOf(empty) == ""
   doAssert modelOf(empty) == ""
   doAssert choices(empty) == 0
-  doAssert finish(empty) == FinishReason.unknown
-  doAssert finish(empty, i = 6) == FinishReason.unknown
-  doAssert firstText(empty) == ""
-  doAssert firstText(empty, i = 2) == ""
-  doAssert allTextParts(empty).len == 0
-  doAssert calls(empty).len == 0
-  doAssert not hasToolCalls(empty)
-  doAssert not hasToolCalls(empty, i = 2)
-  doAssert firstCallId(empty) == ""
-  doAssert firstCallName(empty) == ""
-  doAssert firstCallArgs(empty) == ""
   doAssert promptTokens(empty) == 0
   doAssert completionTokens(empty) == 0
   doAssert totalTokens(empty) == 0
+
+  expectValueError(finish(empty))
+  expectValueError(finish(empty, i = 6))
+  expectValueError(firstText(empty))
+  expectValueError(firstText(empty, i = 2))
+  expectValueError(allTextParts(empty))
+  expectValueError(calls(empty))
+  expectValueError(hasToolCalls(empty))
+  expectValueError(hasToolCalls(empty, i = 2))
+  expectValueError(firstCallId(empty))
+  expectValueError(firstCallName(empty))
+  expectValueError(firstCallArgs(empty))
+
+proc testVarCallsAccessor() =
+  var parsed: ChatCreateResult
+  doAssert chatParse(PartsResponse, parsed)
+
+  calls(parsed).add(ChatCompletionMessageToolCall(
+    id: "call_2",
+    `type`: ChatToolType.function,
+    function: FunctionCall(
+      name: "other",
+      arguments: "{}"
+    )
+  ))
+
+  doAssert hasToolCalls(parsed)
+  doAssert calls(parsed).len == 2
+  doAssert firstCallId(parsed) == "call_1"
+  doAssert firstCallName(parsed) == "lookup"
+  doAssert firstCallArgs(parsed) == "{\"q\":\"nim\"}"
+
+proc testVarStringAccessors() =
+  var parsed: ChatCreateResult
+  doAssert chatParse(PartsResponse, parsed)
+
+  idOf(parsed) = "cmpl_mut"
+  modelOf(parsed) = "gpt-mut"
+  firstText(parsed) = "mut-first"
+  firstCallId(parsed) = "call_mut"
+  firstCallName(parsed) = "lookupMut"
+  firstCallArgs(parsed) = "{\"q\":\"mut\"}"
+
+  doAssert idOf(parsed) == "cmpl_mut"
+  doAssert modelOf(parsed) == "gpt-mut"
+  doAssert firstText(parsed) == "mut-first"
+  doAssert firstCallId(parsed) == "call_mut"
+  doAssert firstCallName(parsed) == "lookupMut"
+  doAssert firstCallArgs(parsed) == "{\"q\":\"mut\"}"
 
 proc testParseFirstTextJson() =
   var parsed: ChatCreateResult
@@ -540,7 +586,9 @@ when isMainModule:
   testChatParse()
   testResponseGettersWithTextContent()
   testResponseGettersWithPartsAndToolCalls()
-  testResponseGetterDefaultsOnMissingChoice()
+  testResponseAccessorsRaiseOnMissingChoice()
+  testVarCallsAccessor()
+  testVarStringAccessors()
   testParseFirstTextJson()
   testParseFirstCallArgs()
   testHttpSuccessClassifier()

@@ -204,10 +204,42 @@ proc chatParse*(body: string; dst: var ChatCreateResult): bool =
 proc isHttpSuccess*(code: int): bool {.inline.} =
   result = code div 100 == 2
 
+proc raiseAccessorValueError(message: string) {.noinline, noreturn.} =
+  raise newException(ValueError, message)
+
+proc raiseInvalidChoiceIndex(i, choiceCount: int) {.inline, noreturn.} =
+  raiseAccessorValueError("choice index " & $i &
+    " out of range for " & $choiceCount & " choices")
+
+proc raiseNoToolCallsAtChoice(i: int) {.inline, noreturn.} =
+  raiseAccessorValueError("choice index " & $i & " has no tool calls")
+
+proc raiseNoTextPartsAtChoice(i: int) {.inline, noreturn.} =
+  raiseAccessorValueError("choice index " & $i & " has no text parts")
+
+proc ensureChoiceIndex(choiceCount, i: int) {.inline.} =
+  if i < 0 or i >= choiceCount:
+    raiseInvalidChoiceIndex(i, choiceCount)
+
+proc firstNonEmptyTextPartIndex(content: ChatCompletionAssistantContent; i: int): int =
+  if content.parts.len == 0:
+    raiseNoTextPartsAtChoice(i)
+  result = 0
+  for partIdx in 0 ..< content.parts.len:
+    if content.parts[partIdx].text.len > 0:
+      result = partIdx
+      break
+
 proc idOf*(x: ChatCreateResult): lent string {.inline.} =
   result = x.id
 
+proc idOf*(x: var ChatCreateResult): var string {.inline.} =
+  result = x.id
+
 proc modelOf*(x: ChatCreateResult): lent string {.inline.} =
+  result = x.model
+
+proc modelOf*(x: var ChatCreateResult): var string {.inline.} =
   result = x.model
 
 proc promptTokens*(x: ChatCreateResult): int {.inline.} =
@@ -222,75 +254,95 @@ proc totalTokens*(x: ChatCreateResult): int {.inline.} =
 proc choices*(x: ChatCreateResult): int {.inline.} =
   result = x.choices.len
 
-proc hasChoiceAt(x: ChatCreateResult; i: int): bool {.inline.} =
-  result = i >= 0 and i < x.choices.len
+proc finish*(x: ChatCreateResult; i = 0): FinishReason {.inline.} =
+  ensureChoiceIndex(x.choices.len, i)
+  result = x.choices[i].finish_reason
 
-proc finish*(x: ChatCreateResult; i = 0): FinishReason =
-  if not x.hasChoiceAt(i):
-    result = FinishReason.unknown
-  else:
-    result = x.choices[i].finish_reason
+proc firstText*(x: ChatCreateResult; i = 0): lent string =
+  ensureChoiceIndex(x.choices.len, i)
+  case x.choices[i].message.content.kind
+  of ChatCompletionAssistantContentKind.text:
+    result = x.choices[i].message.content.text
+  of ChatCompletionAssistantContentKind.parts:
+    let partIdx = firstNonEmptyTextPartIndex(x.choices[i].message.content, i)
+    result = x.choices[i].message.content.parts[partIdx].text
 
-proc firstText*(x: ChatCreateResult; i = 0): string =
-  result = ""
-  if x.hasChoiceAt(i):
-    let content = x.choices[i].message.content
-    case content.kind
-    of ChatCompletionAssistantContentKind.text:
-      result = content.text
-    of ChatCompletionAssistantContentKind.parts:
-      for part in content.parts:
-        if result.len == 0 and part.text.len > 0:
-          return part.text
+proc firstText*(x: var ChatCreateResult; i = 0): var string =
+  ensureChoiceIndex(x.choices.len, i)
+  case x.choices[i].message.content.kind
+  of ChatCompletionAssistantContentKind.text:
+    result = x.choices[i].message.content.text
+  of ChatCompletionAssistantContentKind.parts:
+    let partIdx = firstNonEmptyTextPartIndex(x.choices[i].message.content, i)
+    result = x.choices[i].message.content.parts[partIdx].text
 
 proc parseFirstTextJson*[T](x: ChatCreateResult; dst: var T; i = 0): bool =
   result = false
-  let text = x.firstText(i)
-  if text.len > 0:
-    try:
-      dst = fromJson(text, T)
-      result = true
-    except CatchableError:
-      result = false
+  try:
+    dst = fromJson(x.firstText(i), T)
+    result = true
+  except CatchableError:
+    result = false
 
 proc allTextParts*(x: ChatCreateResult; i = 0): seq[string] =
   result = @[]
-  if x.hasChoiceAt(i):
-    let content = x.choices[i].message.content
-    if content.kind == ChatCompletionAssistantContentKind.parts:
-      for part in content.parts:
-        result.add(part.text)
+  ensureChoiceIndex(x.choices.len, i)
+  if x.choices[i].message.content.kind == ChatCompletionAssistantContentKind.parts:
+    for part in x.choices[i].message.content.parts:
+      result.add(part.text)
 
-proc calls*(x: ChatCreateResult; i = 0): seq[ChatCompletionMessageToolCall] =
-  result = @[]
-  if x.hasChoiceAt(i):
-    result = x.choices[i].message.tool_calls
+proc calls*(x: ChatCreateResult; i = 0): lent seq[ChatCompletionMessageToolCall] {.inline.} =
+  ensureChoiceIndex(x.choices.len, i)
+  result = x.choices[i].message.tool_calls
+
+proc calls*(x: var ChatCreateResult; i = 0): var seq[ChatCompletionMessageToolCall] {.inline.} =
+  ensureChoiceIndex(x.choices.len, i)
+  result = x.choices[i].message.tool_calls
 
 proc hasToolCalls*(x: ChatCreateResult; i = 0): bool =
-  result = false
-  if x.hasChoiceAt(i):
-    result = x.choices[i].message.tool_calls.len > 0
+  ensureChoiceIndex(x.choices.len, i)
+  result = x.choices[i].message.tool_calls.len > 0
 
-proc firstCallId*(x: ChatCreateResult; i = 0): string =
-  result = ""
-  if x.hasToolCalls(i):
-    result = x.choices[i].message.tool_calls[0].id
+proc firstCallId*(x: ChatCreateResult; i = 0): lent string {.inline.} =
+  ensureChoiceIndex(x.choices.len, i)
+  if x.choices[i].message.tool_calls.len == 0:
+    raiseNoToolCallsAtChoice(i)
+  result = x.choices[i].message.tool_calls[0].id
 
-proc firstCallName*(x: ChatCreateResult; i = 0): string =
-  result = ""
-  if x.hasToolCalls(i):
-    result = x.choices[i].message.tool_calls[0].function.name
+proc firstCallId*(x: var ChatCreateResult; i = 0): var string {.inline.} =
+  ensureChoiceIndex(x.choices.len, i)
+  if x.choices[i].message.tool_calls.len == 0:
+    raiseNoToolCallsAtChoice(i)
+  result = x.choices[i].message.tool_calls[0].id
 
-proc firstCallArgs*(x: ChatCreateResult; i = 0): string =
-  result = ""
-  if x.hasToolCalls(i):
-    result = x.choices[i].message.tool_calls[0].function.arguments
+proc firstCallName*(x: ChatCreateResult; i = 0): lent string {.inline.} =
+  ensureChoiceIndex(x.choices.len, i)
+  if x.choices[i].message.tool_calls.len == 0:
+    raiseNoToolCallsAtChoice(i)
+  result = x.choices[i].message.tool_calls[0].function.name
+
+proc firstCallName*(x: var ChatCreateResult; i = 0): var string {.inline.} =
+  ensureChoiceIndex(x.choices.len, i)
+  if x.choices[i].message.tool_calls.len == 0:
+    raiseNoToolCallsAtChoice(i)
+  result = x.choices[i].message.tool_calls[0].function.name
+
+proc firstCallArgs*(x: ChatCreateResult; i = 0): lent string {.inline.} =
+  ensureChoiceIndex(x.choices.len, i)
+  if x.choices[i].message.tool_calls.len == 0:
+    raiseNoToolCallsAtChoice(i)
+  result = x.choices[i].message.tool_calls[0].function.arguments
+
+proc firstCallArgs*(x: var ChatCreateResult; i = 0): var string {.inline.} =
+  ensureChoiceIndex(x.choices.len, i)
+  if x.choices[i].message.tool_calls.len == 0:
+    raiseNoToolCallsAtChoice(i)
+  result = x.choices[i].message.tool_calls[0].function.arguments
 
 proc parseFirstCallArgs*[T](x: ChatCreateResult; dst: var T; i = 0): bool =
   result = false
-  if x.hasToolCalls(i):
-    try:
-      dst = fromJson(x.firstCallArgs(i), T)
-      result = true
-    except CatchableError:
-      result = false
+  try:
+    dst = fromJson(x.firstCallArgs(i), T)
+    result = true
+  except CatchableError:
+    result = false
