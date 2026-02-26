@@ -94,6 +94,9 @@ type
     condition: string
     advice: string
 
+  ParsedToolArgs = object
+    q: string
+
 proc sampleParams(streamValue = false): ChatCreateParams =
   chatCreate(
     model = "gpt-4.1-mini",
@@ -497,6 +500,24 @@ proc testParseFirstTextJson() =
   doAssert chatParse(GoodResponse, textOnly)
   doAssert not parseFirstTextJson(textOnly, answer)
 
+proc testParseFirstCallArgs() =
+  var parsed: ChatCreateResult
+  doAssert chatParse(PartsResponse, parsed)
+
+  var args: ParsedToolArgs
+  doAssert parseFirstCallArgs(parsed, args)
+  doAssert args.q == "nim"
+
+  doAssert not parseFirstCallArgs(parsed, args, i = 3)
+
+  var bad = parsed
+  bad.choices[0].message.tool_calls[0].function.arguments = "{bad json"
+  doAssert not parseFirstCallArgs(bad, args)
+
+  var noCalls: ChatCreateResult
+  doAssert chatParse(GoodResponse, noCalls)
+  doAssert not parseFirstCallArgs(noCalls, args)
+
 proc testHttpSuccessClassifier() =
   doAssert isHttpSuccess(200)
   doAssert isHttpSuccess(201)
@@ -521,5 +542,6 @@ when isMainModule:
   testResponseGettersWithPartsAndToolCalls()
   testResponseGetterDefaultsOnMissingChoice()
   testParseFirstTextJson()
+  testParseFirstCallArgs()
   testHttpSuccessClassifier()
   echo "all tests passed"

@@ -117,11 +117,11 @@ proc main() =
     toolChoice = ToolChoice.required,
     responseFormat = formatText
   )
-  let firstTurn = requestChat(client, endpoint, params, requestId = 1)
-  assert hasToolCalls(firstTurn), firstText(firstTurn)
 
   # Run local tool code with model-provided arguments.
-  let toolArgs = fromJson(firstCallArgs(firstTurn), WeatherToolArgs)
+  let firstTurn = requestChat(client, endpoint, params, requestId = 1)
+  var toolArgs: WeatherToolArgs
+  doAssert parseFirstCallArgs(firstTurn, toolArgs), firstCallArgs(firstTurn)
   let toolResult = makeWeatherToolResult(toolArgs)
   echo "\n[Tool Execution]",
     "\n  Tool:        ", firstCallName(firstTurn),
@@ -137,9 +137,10 @@ proc main() =
   ))
   params.tool_choice = ToolChoice.none
   params.response_format = weatherAnswerFormat
+
   let secondTurn = requestChat(client, endpoint, params, requestId = 2)
   var answer: WeatherAnswer
-  assert parseFirstTextJson(secondTurn, answer), firstText(secondTurn)
+  doAssert parseFirstTextJson(secondTurn, answer), firstText(secondTurn)
   echo "\n[Weather Information]",
     "\n  Model:       ", modelOf(secondTurn),
     "\n  City:        ", answer.city,

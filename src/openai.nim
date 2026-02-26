@@ -285,3 +285,12 @@ proc firstCallArgs*(x: ChatCreateResult; i = 0): string =
   result = ""
   if x.hasToolCalls(i):
     result = x.choices[i].message.tool_calls[0].function.arguments
+
+proc parseFirstCallArgs*[T](x: ChatCreateResult; dst: var T; i = 0): bool =
+  result = false
+  if x.hasToolCalls(i):
+    try:
+      dst = fromJson(x.firstCallArgs(i), T)
+      result = true
+    except CatchableError:
+      result = false
