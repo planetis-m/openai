@@ -277,7 +277,6 @@ proc firstText*(x: var ChatCreateResult; i = 0): var string =
     result = x.choices[i].message.content.parts[partIdx].text
 
 proc parseFirstTextJson*[T](x: ChatCreateResult; dst: var T; i = 0): bool =
-  result = false
   try:
     dst = fromJson(x.firstText(i), T)
     result = true
@@ -340,7 +339,6 @@ proc firstCallArgs*(x: var ChatCreateResult; i = 0): var string {.inline.} =
   result = x.choices[i].message.tool_calls[0].function.arguments
 
 proc parseFirstCallArgs*[T](x: ChatCreateResult; dst: var T; i = 0): bool =
-  result = false
   try:
     dst = fromJson(x.firstCallArgs(i), T)
     result = true
