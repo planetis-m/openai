@@ -43,8 +43,9 @@ proc readJson*(dst: var OpenAIErrorResponse; p: var JsonParser;
   if not foundError:
     raiseParseErr(p, "error field")
 
-proc errorParse*(body: string; dst: var OpenAIErrorResponse): bool =
+proc errorParse*(body: string; dst: out OpenAIErrorResponse): bool =
   ## Parses a forward-compatible error envelope.
+  dst = default(OpenAIErrorResponse)
   try:
     dst = fromJson(body, OpenAIErrorResponse)
     result = true

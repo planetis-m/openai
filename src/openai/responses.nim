@@ -197,8 +197,9 @@ proc responseAdd*(batch: var RequestBatch; cfg: OpenAIConfig;
   requestAdd(batch, cfg, hvPost, cfg.url & ResponsesPath, params,
     requestId, timeoutMs, headers)
 
-proc responseParse*(body: string; dst: var ResponseResult): bool =
+proc responseParse*(body: string; dst: out ResponseResult): bool =
   ## Parses a non-streaming Responses API result.
+  dst = default(ResponseResult)
   try:
     dst = fromJson(body, ResponseResult)
     result = true
@@ -248,8 +249,9 @@ proc firstText*(x: ResponseResult): lent string =
   let location = firstNonEmptyTextPartLocation(x)
   result = x.output[location.outputIndex].content[location.partIndex].text
 
-proc parseFirstTextJson*[T](x: ResponseResult; dst: var T): bool =
+proc parseFirstTextJson*[T](x: ResponseResult; dst: out T): bool =
   ## Parses the first non-empty output text in response order as `T`.
+  dst = default(T)
   try:
     dst = fromJson(x.firstText(), T)
     result = true
@@ -303,8 +305,9 @@ proc firstCallArgs*(x: ResponseResult): lent string =
       return x.output[i].arguments
   raiseResponseAccessorError("response has no function calls")
 
-proc parseFirstCallArgs*[T](x: ResponseResult; dst: var T): bool =
+proc parseFirstCallArgs*[T](x: ResponseResult; dst: out T): bool =
   ## Parses the first function call's JSON arguments as `T`.
+  dst = default(T)
   try:
     dst = fromJson(x.firstCallArgs(), T)
     result = true

@@ -57,7 +57,8 @@ proc embeddingAdd*(batch: var RequestBatch; cfg: OpenAIConfig;
   requestAdd(batch, cfg, hvPost, cfg.url & EmbeddingsPath, params,
     requestId, timeoutMs, headers)
 
-proc embeddingParse*(body: string; dst: var EmbeddingResult): bool =
+proc embeddingParse*(body: string; dst: out EmbeddingResult): bool =
+  dst = default(EmbeddingResult)
   try:
     dst = fromJson(body, EmbeddingResult)
     result = true
