@@ -180,13 +180,22 @@ type
     name*: string
     arguments*: string
 
+  ResponseStatus* {.pure.} = enum
+    unknown = ""
+    completed
+    in_progress
+    failed
+    cancelled
+    queued
+    incomplete
+
   ResponseResult* = object
     id*: string
     `object`*: string
     created_at*: float
     completed_at*: Option[int64]
     background*: bool
-    status*: string
+    status*: ResponseStatus
     error*: Option[ResponseError]
     incomplete_details*: Option[ResponseIncomplete]
     model*: string
@@ -234,6 +243,10 @@ proc readJson*(dst: var ResponseOutputPartType; p: var JsonParser;
 proc readJson*(dst: var ResponseOutputKind; p: var JsonParser;
     unknownFields: UnknownFieldPolicy) =
   readOutputType(dst, p, ResponseOutputKind.unknown)
+
+proc readJson*(dst: var ResponseStatus; p: var JsonParser;
+    unknownFields: UnknownFieldPolicy) =
+  readOutputType(dst, p, ResponseStatus.unknown)
 
 proc readJson*(dst: var ResponseContent; p: var JsonParser;
     unknownFields: UnknownFieldPolicy) =

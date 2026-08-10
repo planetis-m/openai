@@ -12,6 +12,6 @@ for f in walkFiles(testDir / "t*.nim"):
   if name == "tester.nim":
     discard
   else:
-    exec "nim c -r " & quoteShell(testDir / name)
+    exec "nim c -r --warningAsError:ProveInit " & quoteShell(testDir / name)
 
 echo "All test files completed."
