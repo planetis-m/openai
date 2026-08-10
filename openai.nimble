@@ -1,5 +1,5 @@
 # Package
-version = "1.0.1"
+version = "1.0.2"
 author = "planetis-m"
 description = "OpenAI-style chat-completions helpers for Nim + relay"
 license = "MIT"

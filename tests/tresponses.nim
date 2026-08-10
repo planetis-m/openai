@@ -308,6 +308,7 @@ block parse_and_access:
   doAssert hasUsage(parsed)
   doAssert inputTokens(parsed) == 20
   doAssert cachedInputTokens(parsed) == 5
+  doAssert cacheWriteTokens(parsed) == 2
   doAssert outputTokens(parsed) == 9
   doAssert reasoningTokens(parsed) == 3
   doAssert totalTokens(parsed) == 29

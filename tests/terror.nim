@@ -17,3 +17,25 @@ block parse_absent_error_field:
 block parse_rejects_garbage:
   var parsed: OpenAIErrorResponse
   doAssert not errorParse("not json", parsed)
+
+block accessors_mask_optional_fields:
+  var parsed: OpenAIErrorResponse
+  doAssert errorParse(
+    """{"error":{"message":"bad","type":"invalid_request_error","param":null,"code":null}}""",
+    parsed)
+  let err = errorOf(parsed)
+  doAssert not err.hasCode
+  doAssert not err.hasParam
+  doAssertRaises ValueError:
+    discard err.codeOf
+  doAssertRaises ValueError:
+    discard err.paramOf
+
+  var full: OpenAIErrorResponse
+  doAssert errorParse(
+    """{"error":{"message":"bad","type":"invalid_request_error","param":"temperature","code":"unsupported_value"}}""",
+    full)
+  doAssert errorOf(full).hasCode
+  doAssert errorOf(full).codeOf == "unsupported_value"
+  doAssert errorOf(full).hasParam
+  doAssert errorOf(full).paramOf == "temperature"

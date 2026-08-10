@@ -326,6 +326,9 @@ proc inputTokens*(x: ResponseResult): int {.inline.} =
 proc cachedInputTokens*(x: ResponseResult): int {.inline.} =
   x.usageOf().input_tokens_details.cached_tokens
 
+proc cacheWriteTokens*(x: ResponseResult): int {.inline.} =
+  x.usageOf().input_tokens_details.cache_write_tokens
+
 proc outputTokens*(x: ResponseResult): int {.inline.} =
   x.usageOf().output_tokens
 

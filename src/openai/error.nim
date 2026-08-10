@@ -54,3 +54,26 @@ proc errorParse*(body: string; dst: var OpenAIErrorResponse): bool =
 proc errorOf*(x: OpenAIErrorResponse): lent OpenAIError =
   ## Returns the parsed API error.
   result = x.error
+
+proc raiseErrorAccessorError(message: string) {.noinline, noreturn.} =
+  raise newException(ValueError, message)
+
+proc hasCode*(x: OpenAIError): bool {.inline.} =
+  ## Returns whether the API reported a machine-readable error code.
+  x.code.isSome
+
+proc codeOf*(x: OpenAIError): lent string {.inline.} =
+  ## Returns the API error code, raising `ValueError` when absent.
+  if x.code.isNone:
+    raiseErrorAccessorError("error has no code")
+  result = x.code.get
+
+proc hasParam*(x: OpenAIError): bool {.inline.} =
+  ## Returns whether the API implicated a request parameter.
+  x.param.isSome
+
+proc paramOf*(x: OpenAIError): lent string {.inline.} =
+  ## Returns the implicated request parameter, raising `ValueError` when absent.
+  if x.param.isNone:
+    raiseErrorAccessorError("error has no param")
+  result = x.param.get
