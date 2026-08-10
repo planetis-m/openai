@@ -256,9 +256,16 @@ proc parseFirstTextJson*[T](x: ResponseResult; dst: var T): bool =
   except CatchableError:
     result = false
 
-proc allTextParts*(x: ResponseResult): seq[string] =
-  ## Returns all output-text parts in response order.
-  result = @[]
+proc outputText*(x: ResponseResult): string =
+  ## Returns all output-text parts concatenated in response order,
+  ## or an empty string when the response has no output text.
+  var textLen = 0
+  for item in x.output:
+    for part in item.content:
+      if part.`type` == ResponseOutputPartType.output_text:
+        textLen += part.text.len
+
+  result = newStringOfCap(textLen)
   for item in x.output:
     for part in item.content:
       if part.`type` == ResponseOutputPartType.output_text:

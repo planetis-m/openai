@@ -296,7 +296,7 @@ block parse_and_access:
     ResponseOutputPartType.output_text
   doAssert parsed.output[1].`type` == ResponseOutputKind.function_call
   doAssert firstText(parsed) == "{\"answer\":42}"
-  doAssert allTextParts(parsed) == @["{\"answer\":42}"]
+  doAssert outputText(parsed) == "{\"answer\":42}"
   doAssertRaises ValueError:
     discard outputItem(parsed, -1)
   doAssert outputItem(parsed, 1).`type` == ResponseOutputKind.function_call
@@ -342,15 +342,14 @@ block parse_and_access:
     ]
   ))
   doAssert firstText(parsed) == "{\"answer\":42,\"future\":true}"
-  doAssert allTextParts(parsed) ==
-    @["{\"answer\":42,\"future\":true}", "", "later"]
+  doAssert outputText(parsed) == "{\"answer\":42,\"future\":true}later"
   outputItem(parsed, 2).content[2].text = "changed"
   doAssert outputItem(parsed, 2).content[2].text == "changed"
 
   var heterogeneous = parsed
   heterogeneous.output.delete(0)
   doAssert firstText(heterogeneous) == "changed"
-  doAssert allTextParts(heterogeneous) == @["", "changed"]
+  doAssert outputText(heterogeneous) == "changed"
 
   let futureItem = fromJson(
     """{"id":"future_1","type":"future_output_item","status":"completed"}""",
@@ -379,7 +378,7 @@ block missing_accessors:
     discard firstText(parsed)
   doAssertRaises ValueError:
     discard outputItem(parsed, 0)
-  doAssert allTextParts(parsed).len == 0
+  doAssert outputText(parsed) == ""
   doAssertRaises ValueError:
     discard firstCallId(parsed)
   doAssert not hasError(parsed)

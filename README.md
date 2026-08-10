@@ -386,6 +386,7 @@ proc requestWithRetry(client: Relay; cfg: OpenAIConfig;
   - Chat accessors select a completion with `i = 0`.
   - Responses text and function-call accessors scan the heterogeneous output list in response
     order. Use `outputItem(response, outputIndex)` for explicit positional access.
+  - `allTextParts` concatenates all text parts into one string.
 - Prompt caching:
   `PromptCacheMode`, `PromptCacheTtl`, `PromptCacheOptions`
 - Embeddings:

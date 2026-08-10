@@ -562,7 +562,7 @@ proc testResponseGettersWithTextContent() =
   doAssert parsed.choices.len == 1
   doAssert finish(parsed) == ChatFinishReason.stop
   doAssert firstText(parsed) == "Hello"
-  doAssert allTextParts(parsed).len == 0
+  doAssert outputText(parsed) == "Hello"
   doAssert hasUsage(parsed)
   doAssert usageOf(parsed).total_tokens == 3
   doAssert inputTokens(parsed) == 1
@@ -581,7 +581,7 @@ proc testResponseGettersWithPartsAndToolCalls() =
   doAssert chatParse(PartsResponse, parsed)
   doAssert finish(parsed) == ChatFinishReason.tool_calls
   doAssert firstText(parsed) == "first"
-  doAssert allTextParts(parsed) == @["first", "second"]
+  doAssert outputText(parsed) == "firstsecond"
   doAssert functionCalls(parsed).len == 1
   doAssert hasFunctionCalls(parsed)
   doAssert firstCallId(parsed) == "call_1"
@@ -599,7 +599,7 @@ proc testResponseAccessorsRaiseOnMissingChoice() =
   expectValueError(finish(empty, i = 6))
   expectValueError(firstText(empty))
   expectValueError(firstText(empty, i = 2))
-  expectValueError(allTextParts(empty))
+  expectValueError(outputText(empty))
   expectValueError(functionCalls(empty))
   expectValueError(hasFunctionCalls(empty))
   expectValueError(hasFunctionCalls(empty, i = 2))

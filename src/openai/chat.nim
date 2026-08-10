@@ -308,10 +308,21 @@ proc parseFirstTextJson*[T](x: ChatResult; dst: var T; i = 0): bool =
   except CatchableError:
     result = false
 
-proc allTextParts*(x: ChatResult; i = 0): seq[string] =
-  result = @[]
+proc outputText*(x: ChatResult; i = 0): string =
+  ## Returns the completion text of choice `i`, concatenating text parts
+  ## when necessary, or an empty string when the choice has no content.
   ensureChoiceIndex(x.choices.len, i)
-  if x.choices[i].message.content.kind == ChatAssistantContentKind.parts:
+  case x.choices[i].message.content.kind
+  of ChatAssistantContentKind.none:
+    result = ""
+  of ChatAssistantContentKind.text:
+    result = x.choices[i].message.content.text
+  of ChatAssistantContentKind.parts:
+    var textLen = 0
+    for part in x.choices[i].message.content.parts:
+      textLen += part.text.len
+
+    result = newStringOfCap(textLen)
     for part in x.choices[i].message.content.parts:
       result.add(part.text)
 
