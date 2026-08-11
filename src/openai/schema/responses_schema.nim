@@ -74,7 +74,7 @@ type
     name*: string
 
   ResponseFormatType* = enum
-    text, json_schema
+    text, json_object, json_schema
 
   ResponseFormat* = object
     `type`*: ResponseFormatType
@@ -350,7 +350,7 @@ proc hasReasoning(x: ResponseReasoning): bool {.inline.} =
     x.mode.len > 0 or x.context.len > 0
 
 proc hasTextConfig(x: ResponseTextConfig): bool {.inline.} =
-  x.format.`type` == ResponseFormatType.json_schema or x.verbosity.len > 0
+  x.format.`type` != ResponseFormatType.text or x.verbosity.len > 0
 
 proc writeJson*(s: Stream; x: ResponseParams) =
   var comma = false

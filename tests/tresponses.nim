@@ -114,6 +114,13 @@ block request_scalar_defaults:
       PromptCacheOptions
     )
 
+block loose_json_object_format:
+  let params = responseCreate("gpt-5.6-luna", inputText("Hello"),
+    text = ResponseTextConfig(format: formatJsonObject))
+  doAssert formatJsonObject.`type` == ResponseFormatType.json_object
+  doAssert toJson(params).contains(
+    "\"text\":{\"format\":{\"type\":\"json_object\"}}")
+
 block simple_text_request:
   let params = responseCreate(
     model = "gpt-5.6-luna",

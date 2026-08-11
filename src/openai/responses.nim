@@ -10,7 +10,9 @@ export responses_schema
 
 const ResponsesPath = "/responses"
 
-let formatText* = ResponseFormat(`type`: ResponseFormatType.text)
+let
+  formatText* = ResponseFormat(`type`: ResponseFormatType.text)
+  formatJsonObject* = ResponseFormat(`type`: ResponseFormatType.json_object)
 
 proc inputText*(text: sink string): ResponseInput =
   ## Creates a plain-text Responses API input.
