@@ -30,7 +30,7 @@ proc embeddingCreate*(model: sink string; input: sink EmbeddingInput;
     encodingFormat = EmbeddingFormat.float; dimensions = 0;
     user: sink string = ""): EmbeddingParams =
   ## Creates parameters for `POST /embeddings`.
-  EmbeddingParams(
+  result = EmbeddingParams(
     model: model,
     input: input,
     encoding_format: encodingFormat,
@@ -42,20 +42,17 @@ proc embeddingCreate*(model, input: sink string;
     encodingFormat = EmbeddingFormat.float; dimensions = 0;
     user: sink string = ""): EmbeddingParams =
   ## Creates parameters for a single text input.
-  embeddingCreate(model, inputText(input), encodingFormat,
-    dimensions, user)
+  embeddingCreate(model, inputText(input), encodingFormat, dimensions, user)
 
 proc embeddingRequest*(cfg: OpenAIConfig; params: EmbeddingParams;
     requestId = 0'i64; timeoutMs = 0;
     headers: sink HttpHeaders = emptyHttpHeaders()): RequestSpec =
-  request(cfg, hvPost, cfg.url & EmbeddingsPath, params,
-    requestId, timeoutMs, headers)
+  request(cfg, hvPost, cfg.url & EmbeddingsPath, params, requestId, timeoutMs, headers)
 
 proc embeddingAdd*(batch: var RequestBatch; cfg: OpenAIConfig;
     params: EmbeddingParams; requestId = 0'i64; timeoutMs = 0;
     headers: sink HttpHeaders = emptyHttpHeaders()) =
-  requestAdd(batch, cfg, hvPost, cfg.url & EmbeddingsPath, params,
-    requestId, timeoutMs, headers)
+  requestAdd(batch, cfg, hvPost, cfg.url & EmbeddingsPath, params, requestId, timeoutMs, headers)
 
 proc embeddingParse*(body: string; dst: out EmbeddingResult): bool =
   dst = default(EmbeddingResult)
@@ -104,7 +101,7 @@ proc vectorBase64*(x: var EmbeddingResult; i = 0): var string {.inline.} =
   result = x.data[i].embedding.encoded
 
 proc inputTokens*(x: EmbeddingResult): int {.inline.} =
-  result = x.usage.prompt_tokens
+  x.usage.prompt_tokens
 
 proc totalTokens*(x: EmbeddingResult): int {.inline.} =
-  result = x.usage.total_tokens
+  x.usage.total_tokens

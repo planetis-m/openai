@@ -202,17 +202,17 @@ proc usageOf*(x: Batch): lent BatchUsage {.inline.} =
 proc inputTokens*(x: Batch): int {.inline.} =
   x.usageOf().input_tokens
 
-proc outputTokens*(x: Batch): int {.inline.} =
-  x.usageOf().output_tokens
-
-proc totalTokens*(x: Batch): int {.inline.} =
-  x.usageOf().total_tokens
-
 proc cachedInputTokens*(x: Batch): int {.inline.} =
   x.usageOf().input_tokens_details.cached_tokens
 
+proc outputTokens*(x: Batch): int {.inline.} =
+  x.usageOf().output_tokens
+
 proc reasoningTokens*(x: Batch): int {.inline.} =
   x.usageOf().output_tokens_details.reasoning_tokens
+
+proc totalTokens*(x: Batch): int {.inline.} =
+  x.usageOf().total_tokens
 
 proc hasOutputResponse*(x: BatchOutputLine): bool {.inline.} =
   x.response.isSome

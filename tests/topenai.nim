@@ -568,6 +568,7 @@ proc testResponseGettersWithTextContent() =
   doAssert inputTokens(parsed) == 1
   doAssert outputTokens(parsed) == 2
   doAssert cachedInputTokens(parsed) == 0
+  doAssert cacheWriteTokens(parsed) == 0
   doAssert reasoningTokens(parsed) == 0
   doAssert totalTokens(parsed) == 3
   doAssert functionCalls(parsed).len == 0

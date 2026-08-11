@@ -157,6 +157,10 @@ contract materially clearer. Call out any such change in the handoff.
 - Where useful and safe, pair a direct indexed-storage accessor with a `var T` overload that returns
   the underlying storage directly. Semantic selection accessors such as `firstText` return `lent T`
   only. Never return a borrow through a temporary local.
+- A `var T` overload earns its keep only for a direct-storage accessor to a real owned payload
+  (a `seq` or string) that a caller may want to drain with `move(...)`: auto-sink never fires
+  through an accessor call, so the overload's entire value is enabling explicit ownership transfer.
+  Do not add `var` overloads for derived values, semantic selections, or scalars.
 - Validate indices before indexing. Route repeated failure cases through one private
   `{.noinline, noreturn.}` helper that raises a precise `ValueError`.
 - For required optional data, expose `hasX` and a strict accessor. The strict accessor raises rather

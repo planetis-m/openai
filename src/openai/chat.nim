@@ -275,11 +275,14 @@ proc usageOf*(x: ChatResult): lent ChatUsage {.inline.} =
 proc inputTokens*(x: ChatResult): int {.inline.} =
   x.usageOf().prompt_tokens
 
-proc outputTokens*(x: ChatResult): int {.inline.} =
-  x.usageOf().completion_tokens
-
 proc cachedInputTokens*(x: ChatResult): int {.inline.} =
   x.usageOf().prompt_tokens_details.cached_tokens
+
+proc cacheWriteTokens*(x: ChatResult): int {.inline.} =
+  x.usageOf().prompt_tokens_details.cache_write_tokens
+
+proc outputTokens*(x: ChatResult): int {.inline.} =
+  x.usageOf().completion_tokens
 
 proc reasoningTokens*(x: ChatResult): int {.inline.} =
   x.usageOf().completion_tokens_details.reasoning_tokens
