@@ -226,7 +226,7 @@ proc firstNonEmptyTextPartLocation(
     x: ResponseResult): tuple[outputIndex, partIndex: int] =
   for outputIndex in 0..<x.output.len:
     for partIndex in 0..<x.output[outputIndex].content.len:
-      let part = x.output[outputIndex].content[partIndex]
+      template part: untyped = x.output[outputIndex].content[partIndex]
       if part.`type` == ResponseOutputPartType.output_text and part.text.len > 0:
         return (outputIndex, partIndex)
   raiseNoOutputText()
