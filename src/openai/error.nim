@@ -45,11 +45,11 @@ proc readJson*(dst: var OpenAIErrorResponse; p: var JsonParser;
 
 proc errorParse*(body: string; dst: out OpenAIErrorResponse): bool =
   ## Parses a forward-compatible error envelope.
-  dst = default(OpenAIErrorResponse)
   try:
     dst = fromJson(body, OpenAIErrorResponse)
     result = true
   except CatchableError:
+    dst = default(OpenAIErrorResponse)
     result = false
 
 proc errorOf*(x: OpenAIErrorResponse): lent OpenAIError =

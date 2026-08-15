@@ -13,3 +13,4 @@
 /tests/terror
 /tests/tmodule_names
 /tests/tresponses
+/tests/tparse_failure

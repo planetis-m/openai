@@ -228,11 +228,11 @@ proc chatAdd*(batch: var RequestBatch; cfg: OpenAIConfig;
 
 proc chatParse*(body: string; dst: out ChatResult): bool =
   ## Parses a non-streaming Chat Completions result.
-  dst = default(ChatResult)
   try:
     dst = fromJson(body, ChatResult)
     result = true
   except CatchableError:
+    dst = default(ChatResult)
     result = false
 
 proc raiseAccessorValueError(message: string) {.noinline, noreturn.} =
@@ -306,11 +306,11 @@ proc firstText*(x: ChatResult; i = 0): lent string =
     result = x.choices[i].message.content.parts[partIdx].text
 
 proc parseFirstTextJson*[T](x: ChatResult; dst: out T; i = 0): bool =
-  dst = default(T)
   try:
     dst = fromJson(x.firstText(i), T)
     result = true
   except CatchableError:
+    dst = default(T)
     result = false
 
 proc outputText*(x: ChatResult; i = 0): string =
@@ -364,9 +364,9 @@ proc firstCallArgs*(x: ChatResult; i = 0): lent string {.inline.} =
   result = x.choices[i].message.tool_calls[0].function.arguments
 
 proc parseFirstCallArgs*[T](x: ChatResult; dst: out T; i = 0): bool =
-  dst = default(T)
   try:
     dst = fromJson(x.firstCallArgs(i), T)
     result = true
   except CatchableError:
+    dst = default(T)
     result = false

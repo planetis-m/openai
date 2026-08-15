@@ -225,7 +225,11 @@ proc testBatchParseAndAccessors() =
 proc testBatchParseFailure() =
   var parsed: Batch
   doAssert not batchParse("{bad json", parsed)
-  doAssert not batchParse("{}", parsed)
+  doAssert parsed.id.len == 0
+  doAssert parsed.input_file_id.len == 0
+  doAssert batchParse("{}", parsed)
+  doAssert parsed.id.len == 0
+  doAssert parsed.input_file_id.len == 0
 
 proc testBatchListParse() =
   var parsed: BatchList

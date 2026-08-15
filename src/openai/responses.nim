@@ -201,11 +201,11 @@ proc responseAdd*(batch: var RequestBatch; cfg: OpenAIConfig;
 
 proc responseParse*(body: string; dst: out ResponseResult): bool =
   ## Parses a non-streaming Responses API result.
-  dst = default(ResponseResult)
   try:
     dst = fromJson(body, ResponseResult)
     result = true
   except CatchableError:
+    dst = default(ResponseResult)
     result = false
 
 proc raiseResponseAccessorError(message: string) {.noinline, noreturn.} =
@@ -253,11 +253,11 @@ proc firstText*(x: ResponseResult): lent string =
 
 proc parseFirstTextJson*[T](x: ResponseResult; dst: out T): bool =
   ## Parses the first non-empty output text in response order as `T`.
-  dst = default(T)
   try:
     dst = fromJson(x.firstText(), T)
     result = true
   except CatchableError:
+    dst = default(T)
     result = false
 
 proc outputText*(x: ResponseResult): string =
@@ -309,11 +309,11 @@ proc firstCallArgs*(x: ResponseResult): lent string =
 
 proc parseFirstCallArgs*[T](x: ResponseResult; dst: out T): bool =
   ## Parses the first function call's JSON arguments as `T`.
-  dst = default(T)
   try:
     dst = fromJson(x.firstCallArgs(), T)
     result = true
   except CatchableError:
+    dst = default(T)
     result = false
 
 proc hasError*(x: ResponseResult): bool {.inline.} =

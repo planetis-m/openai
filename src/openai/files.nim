@@ -84,27 +84,27 @@ proc fileDeleteRequest*(cfg: OpenAIConfig; fileId: string;
     requestId, timeoutMs, headers)
 
 proc fileParse*(body: string; dst: out FileInfo): bool =
-  dst = default(FileInfo)
   try:
     dst = fromJson(body, FileInfo)
-    result = dst.id.len > 0
+    result = true
   except CatchableError:
+    dst = default(FileInfo)
     result = false
 
 proc fileListParse*(body: string; dst: out FilePage): bool =
-  dst = default(FilePage)
   try:
     dst = fromJson(body, FilePage)
     result = true
   except CatchableError:
+    dst = default(FilePage)
     result = false
 
 proc fileDeletedParse*(body: string; dst: out DeletedFile): bool =
-  dst = default(DeletedFile)
   try:
     dst = fromJson(body, DeletedFile)
     result = true
   except CatchableError:
+    dst = default(DeletedFile)
     result = false
 
 proc expiresAt*(x: FileInfo): int64 {.inline.} =
