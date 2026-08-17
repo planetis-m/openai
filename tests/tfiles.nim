@@ -100,7 +100,7 @@ proc testFileParseAndAccessors() =
   doAssert expiresAt(file) == 0
   doAssert not fileParse("{bad", file)
   doAssert file == default(FileInfo)
-  doAssert fileParse("{}", file)
+  doAssert not fileParse("{}", file)
   doAssert file == default(FileInfo)
 
   var list: FilePage

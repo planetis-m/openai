@@ -70,7 +70,7 @@ proc inputLineJson*(customId: sink string; body: sink RawJson; url: string): str
 proc batchParse*(body: string; dst: out Batch): bool =
   try:
     dst = fromJson(body, Batch)
-    result = true
+    result = dst.id.len > 0
   except CatchableError:
     dst = default(Batch)
     result = false

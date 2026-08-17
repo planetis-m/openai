@@ -22,9 +22,9 @@ block batch_parse_failure_leaves_default:
   doAssert parsed.input_file_id.len == 0
   doAssert parsed.status == BatchStatus.validating
 
-block batch_parse_missing_id_still_succeeds:
+block batch_parse_missing_id_fails:
   var parsed: Batch
-  doAssert batchParse("""{"id":"","status":"expired"}""", parsed)
+  doAssert not batchParse("""{"id":"","status":"expired"}""", parsed)
   doAssert parsed.id.len == 0
   doAssert parsed.status == BatchStatus.expired
   doAssert not batchParse("{", parsed)
@@ -84,9 +84,9 @@ block file_parse_failure_leaves_default:
   doAssert parsed.filename.len == 0
   doAssert parsed.expires_at.isNone
 
-block file_parse_missing_id_still_succeeds:
+block file_parse_missing_id_fails:
   var parsed: FileInfo
-  doAssert fileParse("""{"id":"","filename":"a.json"}""", parsed)
+  doAssert not fileParse("""{"id":"","filename":"a.json"}""", parsed)
   doAssert parsed.id.len == 0
   doAssert parsed.filename == "a.json"
   doAssert not fileParse("{", parsed)

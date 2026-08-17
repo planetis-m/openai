@@ -227,7 +227,7 @@ proc testBatchParseFailure() =
   doAssert not batchParse("{bad json", parsed)
   doAssert parsed.id.len == 0
   doAssert parsed.input_file_id.len == 0
-  doAssert batchParse("{}", parsed)
+  doAssert not batchParse("{}", parsed)
   doAssert parsed.id.len == 0
   doAssert parsed.input_file_id.len == 0
 
