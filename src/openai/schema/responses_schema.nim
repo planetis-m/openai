@@ -157,6 +157,7 @@ type
     unknown = ""
     output_text
     refusal
+    reasoning_text
 
   ResponseOutputPart* = object
     `type`*: ResponseOutputPartType
@@ -169,16 +170,62 @@ type
     unknown = ""
     message
     function_call
+    reasoning
+    file_search_call
+    computer_call
+    web_search_call
+    image_generation_call
+    code_interpreter_call
+    local_shell_call
+    mcp_call
+    mcp_list_tools
+    mcp_approval_request
+    custom_tool_call
+    apply_patch_call
+    shell_call
+    compaction
 
-  ResponseOutput* = object
-    id*: string
-    `type`*: ResponseOutputKind
-    status*: string
+  ResponseReasoningSummaryPartType* {.pure.} = enum
+    unknown = ""
+    summary_text
+
+  ResponseReasoningSummaryPart* = object
+    `type`*: ResponseReasoningSummaryPartType
+    text*: string
+
+  ResponseOutputMessage* = object
     role*: string
     content*: seq[ResponseOutputPart]
+
+  ResponseOutputFunctionCall* = object
     call_id*: string
     name*: string
     arguments*: string
+
+  ResponseReasoningOutput* = object
+    summary*: seq[ResponseReasoningSummaryPart]
+    content*: seq[ResponseOutputPart]
+    encrypted_content*: string
+
+  ResponseOutputShape = enum
+    responseOutputMessage
+    responseOutputFunctionCall
+    responseOutputReasoning
+    responseOutputOpaque
+
+  ResponseOutput* = object
+    id*: string
+    status*: string
+    `type`*: ResponseOutputKind
+    case shape: ResponseOutputShape
+    of responseOutputMessage:
+      message*: ResponseOutputMessage
+    of responseOutputFunctionCall:
+      functionCall*: ResponseOutputFunctionCall
+    of responseOutputReasoning:
+      reasoning*: ResponseReasoningOutput
+    of responseOutputOpaque:
+      extraFields*: RawJson
 
   ResponseStatus* {.pure.} = enum
     unknown = ""
@@ -238,11 +285,128 @@ proc readOutputType[T: enum](dst: var T; p: var JsonParser; unknown: T) =
 
 proc readJson*(dst: var ResponseOutputPartType; p: var JsonParser;
     unknownFields: UnknownFieldPolicy) =
-  readOutputType(dst, p, ResponseOutputPartType.unknown)
+  readOutputType(dst, p, default(ResponseOutputPartType))
 
 proc readJson*(dst: var ResponseOutputKind; p: var JsonParser;
     unknownFields: UnknownFieldPolicy) =
-  readOutputType(dst, p, ResponseOutputKind.unknown)
+  readOutputType(dst, p, default(ResponseOutputKind))
+
+proc readJson*(dst: var ResponseReasoningSummaryPartType; p: var JsonParser;
+    unknownFields: UnknownFieldPolicy) =
+  readOutputType(dst, p, default(ResponseReasoningSummaryPartType))
+
+proc appendRawField(dst: var string; name: string; p: var JsonParser) =
+  if dst.len == 0:
+    dst.add('{')
+  else:
+    dst.add(',')
+  escapeJson(name, dst)
+  dst.add(':')
+  appendRawJson(dst, p)
+
+proc finishRawObject(dst: var string): RawJson {.inline.} =
+  if dst.len > 0:
+    dst.add('}')
+  result = RawJson(move(dst))
+
+proc makeTypedResponseOutput(kind: ResponseOutputKind; id, status, role: sink string;
+    content: sink seq[ResponseOutputPart]; callId, name, arguments: sink string;
+    summary: sink seq[ResponseReasoningSummaryPart];
+    encryptedContent: sink string): ResponseOutput =
+  case kind
+  of message:
+    result = ResponseOutput(
+      id: id,
+      status: status,
+      `type`: kind,
+      shape: responseOutputMessage,
+      message: ResponseOutputMessage(role: role, content: content)
+    )
+  of function_call:
+    result = ResponseOutput(
+      id: id,
+      status: status,
+      `type`: kind,
+      shape: responseOutputFunctionCall,
+      functionCall: ResponseOutputFunctionCall(
+        call_id: callId,
+        name: name,
+        arguments: arguments
+      )
+    )
+  of reasoning:
+    result = ResponseOutput(
+      id: id,
+      status: status,
+      `type`: kind,
+      shape: responseOutputReasoning,
+      reasoning: ResponseReasoningOutput(
+        summary: summary,
+        content: content,
+        encrypted_content: encryptedContent
+      )
+    )
+  else:
+    discard
+
+proc readJson*(dst: var ResponseOutput; p: var JsonParser; unknownFields: UnknownFieldPolicy) =
+  var id, status, role, callId, name, arguments, encryptedContent: string
+  var kind: ResponseOutputKind
+  var content: seq[ResponseOutputPart]
+  var summary: seq[ResponseReasoningSummaryPart]
+  var extra = ""
+
+  eat(p, tkCurlyLe)
+  while p.tok != tkCurlyRi:
+    if p.tok != tkString:
+      raiseParseErr(p, "string literal as key")
+    let fieldName = p.a
+    discard getTok(p)
+    eat(p, tkColon)
+    case fieldName
+    of "id":
+      readJson(id, p, unknownFields)
+    of "status":
+      readJson(status, p, unknownFields)
+    of "type":
+      readJson(kind, p, unknownFields)
+    of "role":
+      readJson(role, p, unknownFields)
+    of "content":
+      readJson(content, p, unknownFields)
+    of "call_id":
+      readJson(callId, p, unknownFields)
+    of "name":
+      readJson(name, p, unknownFields)
+    of "arguments":
+      readJson(arguments, p, unknownFields)
+    of "summary":
+      readJson(summary, p, unknownFields)
+    of "encrypted_content":
+      readJson(encryptedContent, p, unknownFields)
+    else:
+      appendRawField(extra, fieldName, p)
+
+    if p.tok == tkComma:
+      discard getTok(p)
+    elif p.tok != tkCurlyRi:
+      raiseParseErr(p, "',' or '}'")
+  eat(p, tkCurlyRi)
+
+  case kind
+  of message, function_call, reasoning:
+    if unknownFields == ufReject and extra.len > 0:
+      raiseParseErr(p, "known field for this typed output item")
+    dst = makeTypedResponseOutput(kind, id, status, role, content, callId,
+      name, arguments, summary, encryptedContent)
+  else:
+    dst = ResponseOutput(
+      id: id,
+      status: status,
+      `type`: kind,
+      shape: responseOutputOpaque,
+      extraFields: finishRawObject(extra)
+    )
 
 proc readJson*(dst: var ResponseStatus; p: var JsonParser;
     unknownFields: UnknownFieldPolicy) =

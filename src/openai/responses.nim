@@ -225,10 +225,11 @@ proc ensureOutputIndex(outputCount, i: int) {.inline.} =
 proc firstNonEmptyTextPartLocation(
     x: ResponseResult): tuple[outputIndex, partIndex: int] =
   for outputIndex in 0..<x.output.len:
-    for partIndex in 0..<x.output[outputIndex].content.len:
-      template part: untyped = x.output[outputIndex].content[partIndex]
-      if part.`type` == ResponseOutputPartType.output_text and part.text.len > 0:
-        return (outputIndex, partIndex)
+    if x.output[outputIndex].`type` == message:
+      for partIndex in 0..<x.output[outputIndex].message.content.len:
+        template part: untyped = x.output[outputIndex].message.content[partIndex]
+        if part.`type` == ResponseOutputPartType.output_text and part.text.len > 0:
+          return (outputIndex, partIndex)
   raiseNoOutputText()
 
 proc createdAt*(x: ResponseResult): float {.inline.} =
@@ -246,10 +247,38 @@ proc outputItem*(x: var ResponseResult;
   ensureOutputIndex(x.output.len, outputIndex)
   result = x.output[outputIndex]
 
+proc messageOf*(x: ResponseOutput): lent ResponseOutputMessage {.inline.} =
+  ## Returns this output message, or raises ValueError for another item kind.
+  if x.`type` != message:
+    raiseResponseAccessorError("output item is not a message")
+  result = x.message
+
+proc functionCallOf*(x: ResponseOutput): lent ResponseOutputFunctionCall {.inline.} =
+  ## Returns this function call, or raises ValueError for another item kind.
+  if x.`type` != function_call:
+    raiseResponseAccessorError("output item is not a function call")
+  result = x.functionCall
+
+proc reasoningOf*(x: ResponseOutput): lent ResponseReasoningOutput {.inline.} =
+  ## Returns this reasoning item, or raises ValueError for another item kind.
+  if x.`type` != reasoning:
+    raiseResponseAccessorError("output item is not reasoning")
+  result = x.reasoning
+
+proc hasExtraFields*(x: ResponseOutput): bool {.inline.} =
+  ## Returns whether this output item has an opaque payload.
+  x.`type` notin {message, function_call, reasoning}
+
+proc extraFieldsOf*(x: ResponseOutput): lent RawJson {.inline.} =
+  ## Returns this opaque output item's non-header fields.
+  if not x.hasExtraFields:
+    raiseResponseAccessorError("output item has a typed payload")
+  result = x.extraFields
+
 proc firstText*(x: ResponseResult): lent string =
   ## Returns the first non-empty output-text part in response order.
   let location = firstNonEmptyTextPartLocation(x)
-  result = x.output[location.outputIndex].content[location.partIndex].text
+  result = x.output[location.outputIndex].messageOf().content[location.partIndex].text
 
 proc parseFirstTextJson*[T](x: ResponseResult; dst: out T): bool =
   ## Parses the first non-empty output text in response order as `T`.
@@ -265,46 +294,48 @@ proc outputText*(x: ResponseResult): string =
   ## or an empty string when the response has no output text.
   var textLen = 0
   for item in x.output:
-    for part in item.content:
-      if part.`type` == ResponseOutputPartType.output_text:
-        textLen += part.text.len
+    if item.`type` == message:
+      for part in item.messageOf().content:
+        if part.`type` == ResponseOutputPartType.output_text:
+          textLen += part.text.len
 
   result = newStringOfCap(textLen)
   for item in x.output:
-    for part in item.content:
-      if part.`type` == ResponseOutputPartType.output_text:
-        result.add(part.text)
+    if item.`type` == message:
+      for part in item.messageOf().content:
+        if part.`type` == ResponseOutputPartType.output_text:
+          result.add(part.text)
 
 proc functionCalls*(x: ResponseResult): seq[ResponseOutput] =
   ## Returns all function-call output items in response order.
   result = @[]
   for item in x.output:
-    if item.`type` == ResponseOutputKind.function_call:
+    if item.`type` == function_call:
       result.add(item)
 
 proc hasFunctionCalls*(x: ResponseResult): bool =
   ## Returns whether the response contains a function-call output item.
   result = false
   for item in x.output:
-    if item.`type` == ResponseOutputKind.function_call:
+    if item.`type` == function_call:
       return true
 
 proc firstCallId*(x: ResponseResult): lent string =
   for i in 0..<x.output.len:
-    if x.output[i].`type` == ResponseOutputKind.function_call:
-      return x.output[i].call_id
+    if x.output[i].`type` == function_call:
+      return x.output[i].functionCallOf().call_id
   raiseResponseAccessorError("response has no function calls")
 
 proc firstCallName*(x: ResponseResult): lent string =
   for i in 0..<x.output.len:
-    if x.output[i].`type` == ResponseOutputKind.function_call:
-      return x.output[i].name
+    if x.output[i].`type` == function_call:
+      return x.output[i].functionCallOf().name
   raiseResponseAccessorError("response has no function calls")
 
 proc firstCallArgs*(x: ResponseResult): lent string =
   for i in 0..<x.output.len:
-    if x.output[i].`type` == ResponseOutputKind.function_call:
-      return x.output[i].arguments
+    if x.output[i].`type` == function_call:
+      return x.output[i].functionCallOf().arguments
   raiseResponseAccessorError("response has no function calls")
 
 proc parseFirstCallArgs*[T](x: ResponseResult; dst: out T): bool =

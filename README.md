@@ -382,10 +382,13 @@ proc requestWithRetry(client: Relay; cfg: OpenAIConfig;
 - Shared response accessors:
   `createdAt`, `firstText`, `allTextParts`, `functionCalls`,
   `firstCallId`, `firstCallName`, `firstCallArgs`, `parseFirstTextJson`,
-  `parseFirstCallArgs`, `inputTokens`, `outputTokens`, `totalTokens`
+  `parseFirstCallArgs`, `messageOf`, `functionCallOf`, `reasoningOf`,
+  `hasExtraFields`, `extraFieldsOf`, `inputTokens`, `outputTokens`, `totalTokens`
   - Chat accessors select a completion with `i = 0`.
   - Responses text and function-call accessors scan the heterogeneous output list in response
     order. Use `outputItem(response, outputIndex)` for explicit positional access.
+  - `messageOf`, `functionCallOf`, and `reasoningOf` return the typed payload for those output
+    kinds. Other output kinds retain their unmodelled fields in `extraFieldsOf`.
   - `allTextParts` concatenates all text parts into one string.
 - Prompt caching:
   `PromptCacheMode`, `PromptCacheTtl`, `PromptCacheOptions`

@@ -299,7 +299,7 @@ block parse_and_access:
   doAssert createdAt(parsed) == 1786200000.0
   doAssert parsed.output.len == 2
   doAssert parsed.output[0].`type` == ResponseOutputKind.message
-  doAssert parsed.output[0].content[0].`type` ==
+  doAssert parsed.output[0].messageOf().content[0].`type` ==
     ResponseOutputPartType.output_text
   doAssert parsed.output[1].`type` == ResponseOutputKind.function_call
   doAssert firstText(parsed) == "{\"answer\":42}"
@@ -326,32 +326,26 @@ block parse_and_access:
   doAssert parseFirstCallArgs(parsed, args)
   doAssert args.q == "nim"
 
-  parsed.output[0].content[0].text = """{"answer":42,"future":true}"""
+  parsed.output[0].message.content[0].text = """{"answer":42,"future":true}"""
   doAssert parseFirstTextJson(parsed, answer)
-  parsed.output[1].arguments = """{"q":"nim","future":true}"""
+  parsed.output[1].functionCall.arguments = """{"q":"nim","future":true}"""
   doAssert parseFirstCallArgs(parsed, args)
 
-  parsed.output.add(ResponseOutput(
-    `type`: ResponseOutputKind.message,
-    content: @[
-      ResponseOutputPart(
-        `type`: ResponseOutputPartType.refusal,
-        refusal: "no"
-      ),
-      ResponseOutputPart(
-        `type`: ResponseOutputPartType.output_text,
-        text: ""
-      ),
-      ResponseOutputPart(
-        `type`: ResponseOutputPartType.output_text,
-        text: "later"
-      )
+  parsed.output.add(fromJson("""{
+    "id":"msg_2",
+    "type":"message",
+    "status":"completed",
+    "role":"assistant",
+    "content":[
+      {"type":"refusal","refusal":"no"},
+      {"type":"output_text","text":""},
+      {"type":"output_text","text":"later"}
     ]
-  ))
+  }""", ResponseOutput))
   doAssert firstText(parsed) == "{\"answer\":42,\"future\":true}"
   doAssert outputText(parsed) == "{\"answer\":42,\"future\":true}later"
-  outputItem(parsed, 2).content[2].text = "changed"
-  doAssert outputItem(parsed, 2).content[2].text == "changed"
+  outputItem(parsed, 2).message.content[2].text = "changed"
+  doAssert outputItem(parsed, 2).message.content[2].text == "changed"
 
   var heterogeneous = parsed
   heterogeneous.output.delete(0)
@@ -364,11 +358,54 @@ block parse_and_access:
   )
   doAssert futureItem.`type` == ResponseOutputKind.unknown
 
+  let imageItem = fromJson("""{
+    "id":"img_1",
+    "type":"image_generation_call",
+    "status":"completed",
+    "result":"base64",
+    "future":true
+  }""", ResponseOutput)
+  doAssert imageItem.`type` == ResponseOutputKind.image_generation_call
+  doAssert hasExtraFields(imageItem)
+  doAssert string(extraFieldsOf(imageItem)) ==
+    """{"result":"base64","future":true}"""
+  let strictImageItem = fromJson("""{
+    "id":"img_2",
+    "type":"image_generation_call",
+    "status":"completed",
+    "result":"base64"
+  }""", ResponseOutput, unknownFields = ufReject)
+  doAssert string(extraFieldsOf(strictImageItem)) == """{"result":"base64"}"""
+  doAssertRaises ValueError:
+    discard extraFieldsOf(parsed.output[0])
+  doAssertRaises JsonParsingError:
+    discard fromJson("""{
+      "id":"msg_3", "type":"message", "status":"completed",
+      "role":"assistant", "content":[], "future":true
+    }""", ResponseOutput, unknownFields = ufReject)
+
   let futureContent = fromJson(
     """{"type":"future_content","text":"future"}""",
     ResponseOutputPart
   )
   doAssert futureContent.`type` == ResponseOutputPartType.unknown
+
+block response_output_reasoning:
+  let item = fromJson("""{
+    "id":"rs_1",
+    "summary":[{"type":"summary_text","text":"plan"}],
+    "content":[{"type":"reasoning_text","text":"private"}],
+    "status":"completed",
+    "type":"reasoning",
+    "encrypted_content":"cipher"
+  }""", ResponseOutput)
+  doAssert item.`type` == ResponseOutputKind.reasoning
+  doAssert reasoningOf(item).summary[0].text == "plan"
+  doAssert reasoningOf(item).content[0].`type` == reasoning_text
+  doAssert reasoningOf(item).content[0].text == "private"
+  doAssert reasoningOf(item).encrypted_content == "cipher"
+  doAssertRaises ValueError:
+    discard messageOf(item)
 
 block parse_failure:
   var parsed: ResponseResult
