@@ -2,7 +2,7 @@ import std/options
 export options
 import jsonx
 import jsonx/[parsejson, streams]
-import ./prompt_cache_schema
+import ./[prompt_cache_schema, tolerant_enum]
 
 export prompt_cache_schema
 
@@ -13,7 +13,8 @@ type
   ChatToolType* = enum
     function
 
-  ChatFinishReason* = enum
+  ChatFinishReason* {.pure.} = enum
+    unknown = ""
     stop, length, tool_calls, content_filter
 
   ChatImageDetail* = enum
@@ -187,6 +188,10 @@ const
   ChatToolChoiceAuto* = RawJson("\"auto\"")
   ChatToolChoiceNone* = RawJson("\"none\"")
   ChatToolChoiceRequired* = RawJson("\"required\"")
+
+proc readJson*(dst: var ChatFinishReason; p: var JsonParser;
+    unknownFields: UnknownFieldPolicy) =
+  readTolerantEnum(dst, p)
 
 proc readJson*(dst: var ChatAssistantContent; p: var JsonParser;
     unknownFields: UnknownFieldPolicy) =

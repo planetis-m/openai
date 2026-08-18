@@ -550,6 +550,13 @@ proc testChatParse() =
   doAssert decoded.usage.isSome
   doAssert decoded.usage.get.total_tokens == 3
 
+  var futureReason: ChatResult
+  doAssert chatParse(GoodResponse.replace("\"stop\"", "\"future_reason\""), futureReason)
+  doAssert futureReason.choices[0].finish_reason == ChatFinishReason.unknown
+
+  var numericReason: ChatResult
+  doAssert not chatParse(GoodResponse.replace("\"stop\"", "0"), numericReason)
+
   var bad: ChatResult
   doAssert not chatParse("{", bad)
 

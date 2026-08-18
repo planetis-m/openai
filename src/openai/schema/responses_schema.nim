@@ -2,11 +2,11 @@
 ##
 ## Deprecated API fields are deliberately absent from this schema.
 
-import std/[options, strutils]
+import std/options
 export options
 import jsonx
 import jsonx/[parsejson, streams]
-import ./prompt_cache_schema
+import ./[prompt_cache_schema, tolerant_enum]
 
 export prompt_cache_schema
 
@@ -208,23 +208,23 @@ type
     encrypted_content*: string
 
   ResponseOutputShape = enum
-    responseOutputMessage
-    responseOutputFunctionCall
-    responseOutputReasoning
-    responseOutputOpaque
+    outputMessage
+    outputFunctionCall
+    outputReasoning
+    outputOpaque
 
   ResponseOutput* = object
     id*: string
     status*: string
     `type`*: ResponseOutputKind
     case shape: ResponseOutputShape
-    of responseOutputMessage:
+    of outputMessage:
       message*: ResponseOutputMessage
-    of responseOutputFunctionCall:
+    of outputFunctionCall:
       functionCall*: ResponseOutputFunctionCall
-    of responseOutputReasoning:
+    of outputReasoning:
       reasoning*: ResponseReasoningOutput
-    of responseOutputOpaque:
+    of outputOpaque:
       extraFields*: RawJson
 
   ResponseStatus* {.pure.} = enum
@@ -273,27 +273,17 @@ proc writeJson*(s: Stream; x: ResponseInput) =
   of ResponseInputKind.items:
     writeJson(s, x.items)
 
-proc readOutputType[T: enum](dst: var T; p: var JsonParser; unknown: T) =
-  if p.tok != tkString:
-    raiseParseErr(p, "string for an output type")
-  let value = p.a
-  discard getTok(p)
-  try:
-    dst = parseEnum[T](value)
-  except ValueError:
-    dst = unknown
-
 proc readJson*(dst: var ResponseOutputPartType; p: var JsonParser;
     unknownFields: UnknownFieldPolicy) =
-  readOutputType(dst, p, default(ResponseOutputPartType))
+  readTolerantEnum(dst, p)
 
 proc readJson*(dst: var ResponseOutputKind; p: var JsonParser;
     unknownFields: UnknownFieldPolicy) =
-  readOutputType(dst, p, default(ResponseOutputKind))
+  readTolerantEnum(dst, p)
 
 proc readJson*(dst: var ResponseReasoningSummaryPartType; p: var JsonParser;
     unknownFields: UnknownFieldPolicy) =
-  readOutputType(dst, p, default(ResponseReasoningSummaryPartType))
+  readTolerantEnum(dst, p)
 
 proc appendRawField(dst: var string; name: string; p: var JsonParser) =
   if dst.len == 0:
@@ -319,7 +309,7 @@ proc makeTypedResponseOutput(kind: ResponseOutputKind; id, status, role: sink st
       id: id,
       status: status,
       `type`: kind,
-      shape: responseOutputMessage,
+      shape: outputMessage,
       message: ResponseOutputMessage(role: role, content: content)
     )
   of function_call:
@@ -327,7 +317,7 @@ proc makeTypedResponseOutput(kind: ResponseOutputKind; id, status, role: sink st
       id: id,
       status: status,
       `type`: kind,
-      shape: responseOutputFunctionCall,
+      shape: outputFunctionCall,
       functionCall: ResponseOutputFunctionCall(
         call_id: callId,
         name: name,
@@ -339,7 +329,7 @@ proc makeTypedResponseOutput(kind: ResponseOutputKind; id, status, role: sink st
       id: id,
       status: status,
       `type`: kind,
-      shape: responseOutputReasoning,
+      shape: outputReasoning,
       reasoning: ResponseReasoningOutput(
         summary: summary,
         content: content,
@@ -404,13 +394,13 @@ proc readJson*(dst: var ResponseOutput; p: var JsonParser; unknownFields: Unknow
       id: id,
       status: status,
       `type`: kind,
-      shape: responseOutputOpaque,
+      shape: outputOpaque,
       extraFields: finishRawObject(extra)
     )
 
 proc readJson*(dst: var ResponseStatus; p: var JsonParser;
     unknownFields: UnknownFieldPolicy) =
-  readOutputType(dst, p, ResponseStatus.unknown)
+  readTolerantEnum(dst, p)
 
 proc readJson*(dst: var ResponseContent; p: var JsonParser;
     unknownFields: UnknownFieldPolicy) =
