@@ -3,9 +3,10 @@
 ## call, usage tokens, parsing call arguments).
 ##
 ## Strategies:
-##   jsonx typed    : package `fromJson(body, ResponseResult)` + accessor scans
-##                    (identical logic to `openai/responses` accessors; schema-only
-##                    import avoids linking relay)
+##   jsonx typed    : package `fromJson(body, ResponseResult)` + the real
+##                    `openai/responses` accessors (`firstText`, `firstCallArgs`,
+##                    `inputTokens`, ...). The full package is imported so we
+##                    time the exact path a consumer runs, not a hand-rolled copy.
 ##   std/json typed : `parseJson(body).to(MyFlatTypes)` into flat own types
 ##                    (`type` fields as strings, `JsonNode` for open payloads,
 ##                    `Option` for server-omittable fields)
@@ -13,14 +14,20 @@
 ##   std/json parse : tree construction alone (floor for any std/json strategy)
 ##
 ## Extra rows time the tool-calling inner step: parsing the first call's
-## arguments JSON (jsonx `fromJson(s, T)` vs std `parseJson(s).to(T)`).
+## arguments JSON (jsonx `parseFirstCallArgs` vs std `parseJson(s).to(T)`).
 ##
 ## Build: nim c -d:release -r bench/responses_bench.nim
+## (the package import pulls in relay's curl bindings, hence the -lcurl below;
+##  it affects link time only, not the measured hot loop)
 
 import std/[json, options, strformat, strutils, times, monotimes]
 
 import jsonx
-import openai/schema/responses_schema
+import openai/responses
+
+{.passL: "-lcurl".}
+
+const WarmupIters = 3000
 
 const
   PartCount = 10
@@ -107,48 +114,9 @@ proc makeBody(): string =
   }
   $root
 
-# --- jsonx side: package decode + accessor scans (same logic as the package) --
-
-proc jsonxFirstTextLocation(x: ResponseResult): tuple[outputIndex, partIndex: int] =
-  for outputIndex in 0..<x.output.len:
-    if x.output[outputIndex].`type` == ResponseOutputKind.message:
-      for partIndex in 0..<x.output[outputIndex].message.content.len:
-        if x.output[outputIndex].message.content[partIndex].`type` ==
-            ResponseOutputPartType.output_text and
-            x.output[outputIndex].message.content[partIndex].text.len > 0:
-          return (outputIndex, partIndex)
-  raise newException(ValueError, "no output text")
-
-proc jsonxFirstText(x: ResponseResult): lent string =
-  let location = jsonxFirstTextLocation(x)
-  result = x.output[location.outputIndex].message.content[location.partIndex].text
-
-proc jsonxFirstCall(x: ResponseResult): tuple[id, name, args: string] =
-  for i in 0..<x.output.len:
-    if x.output[i].`type` == ResponseOutputKind.function_call:
-      return (x.output[i].functionCall.call_id, x.output[i].functionCall.name,
-        x.output[i].functionCall.arguments)
-  raise newException(ValueError, "no function calls")
-
-func usageOf(x: ResponseResult): ResponseUsage =
-  if x.usage.isNone:
-    raise newException(ValueError, "no usage")
-  x.usage.get
-
-func jsonxInputTokens(x: ResponseResult): int {.inline.} =
-  x.usageOf().input_tokens
-
-func jsonxOutputTokens(x: ResponseResult): int {.inline.} =
-  x.usageOf().output_tokens
-
-func jsonxCachedInputTokens(x: ResponseResult): int {.inline.} =
-  x.usageOf().input_tokens_details.cached_tokens
-
-func jsonxReasoningTokens(x: ResponseResult): int {.inline.} =
-  x.usageOf().output_tokens_details.reasoning_tokens
-
-func jsonxTotalTokens(x: ResponseResult): int {.inline.} =
-  x.usageOf().total_tokens
+# --- jsonx side: package decode + the real openai/responses accessors ---------
+# (`firstText`, `firstCallArgs`, `inputTokens`, `cachedInputTokens`,
+#  `reasoningTokens`, `totalTokens`, `parseFirstCallArgs` are used directly)
 
 # --- std/json side A: flat own types decoded with the `to` macro -------------
 # `type` discriminators are plain strings: tolerant and case-object free.
@@ -321,22 +289,22 @@ proc main() =
     let std = parseJson(body).to(StdResult)
     var direct: Direct
     extractDirect(body, direct)
-    doAssert jsonxFirstText(r) == stdFirstText(std)
-    doAssert jsonxFirstText(r) == direct.text
-    doAssert jsonxFirstCall(r).args == stdFirstCall(std).args
-    doAssert jsonxFirstCall(r).args == direct.callArgs
-    doAssert jsonxInputTokens(r) == std.usage.get.input_tokens
-    doAssert jsonxInputTokens(r) == direct.inputTokens
-    doAssert jsonxCachedInputTokens(r) == std.usage.get.input_tokens_details.cached_tokens
-    doAssert jsonxCachedInputTokens(r) == direct.cachedTokens
-    doAssert jsonxReasoningTokens(r) == direct.reasoningTokens
-    doAssert jsonxTotalTokens(r) == direct.totalTokens
+    doAssert firstText(r) == stdFirstText(std)
+    doAssert firstText(r) == direct.text
+    doAssert firstCallArgs(r) == stdFirstCall(std).args
+    doAssert firstCallArgs(r) == direct.callArgs
+    doAssert inputTokens(r) == std.usage.get.input_tokens
+    doAssert inputTokens(r) == direct.inputTokens
+    doAssert cachedInputTokens(r) == std.usage.get.input_tokens_details.cached_tokens
+    doAssert cachedInputTokens(r) == direct.cachedTokens
+    doAssert reasoningTokens(r) == direct.reasoningTokens
+    doAssert totalTokens(r) == direct.totalTokens
     doAssert direct.hasUsage
     doAssert r.output[3].`type` == ResponseOutputKind.web_search_call
     doAssert std.output[3].`type` == "web_search_call"
     doAssert std.metadata["job"].getStr == "42"
     var argsA: CallArgs
-    doAssert (argsA = fromJson(jsonxFirstCall(r).args, CallArgs);
+    doAssert (parseFirstCallArgs(r, argsA) and
         argsA.query.len > 0 and argsA.limit == 25)
     let argsB = parseJson(stdFirstCall(std).args).to(CallArgs)
     doAssert argsA.query == argsB.query and argsA.limit == argsB.limit
@@ -350,11 +318,10 @@ proc main() =
 
   proc jsonxTyped() =
     jsonxResult = fromJson(body, ResponseResult)
-    let call = jsonxFirstCall(jsonxResult)
-    consume(jsonxFirstText(jsonxResult), call.args,
-      jsonxInputTokens(jsonxResult), jsonxOutputTokens(jsonxResult),
-      jsonxCachedInputTokens(jsonxResult), jsonxReasoningTokens(jsonxResult),
-      jsonxTotalTokens(jsonxResult))
+    consume(firstText(jsonxResult), firstCallArgs(jsonxResult),
+      inputTokens(jsonxResult), outputTokens(jsonxResult),
+      cachedInputTokens(jsonxResult), reasoningTokens(jsonxResult),
+      totalTokens(jsonxResult))
 
   proc stdTyped() =
     stdResult = parseJson(body).to(StdResult)
@@ -377,14 +344,16 @@ proc main() =
     checksum += tree.len.int64
 
   proc jsonxParseArgs() =
-    parsedArgs = fromJson(jsonxFirstCall(jsonxResult).args, CallArgs)
+    discard parseFirstCallArgs(jsonxResult, parsedArgs)
     checksum += parsedArgs.limit.int64
 
   proc stdParseArgs() =
     parsedArgs = parseJson(stdFirstCall(stdResult).args).to(CallArgs)
     checksum += parsedArgs.limit.int64
 
-  proc measure(name: string; op: proc()) =
+  proc measure(name: string; op: proc(); baseline: float = 0): float =
+    for _ in 1..WarmupIters:
+      op()
     let t0 = getMonoTime()
     op()
     let one = (getMonoTime() - t0).inNanoseconds.float
@@ -398,19 +367,22 @@ proc main() =
       if best == 0 or dt < best:
         best = dt
     let ns = best.float / iters.float
+    let ratio = if baseline > 0: ns / baseline else: 1.0
     echo &"{name:<26} {iters:>7} iters  {ns:>9.0f} ns/op  " &
-      &"{body.len.float * iters.float / best.float * 1e3:>7.1f} MB/s"
+      &"{body.len.float * iters.float / best.float * 1e3:>7.1f} MB/s  " &
+      &"{ratio:>5.2f}x"
+    result = ns
 
   echo ""
   echo "-- timing (best of 3, ~0.4s per round) --"
-  measure("jsonx typed", jsonxTyped)
-  measure("std/json typed (to)", stdTyped)
-  measure("std/json direct", stdDirect)
-  measure("std/json parse only", stdParseOnly)
+  let jsonxNs = measure("jsonx typed", jsonxTyped)
+  discard measure("std/json typed (to)", stdTyped, jsonxNs)
+  discard measure("std/json direct", stdDirect, jsonxNs)
+  discard measure("std/json parse only", stdParseOnly, jsonxNs)
   echo ""
   echo "-- inner step: parse call arguments --"
-  measure("jsonx fromJson(args)", jsonxParseArgs)
-  measure("std parseJson+to(args)", stdParseArgs)
+  let argsNs = measure("jsonx parseFirstCallArgs", jsonxParseArgs)
+  discard measure("std parseJson+to(args)", stdParseArgs, argsNs)
   echo ""
   echo "checksum: ", checksum
 

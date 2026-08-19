@@ -420,11 +420,11 @@ realistic 9 KB body (`nim c -d:release -r bench/responses_bench.nim`):
 
 | strategy | ns/op | MB/s |
 |---|---|---|
-| **jsonx typed** (`fromJson` + accessors) | **25.6 µs** | **359** |
-| std/json typed (`parseJson().to(FlatTypes)`) | 65.0 µs | 141 |
-| std/json direct (`parseJson` + tree access) | 44.4 µs | 207 |
+| **jsonx typed** (`fromJson` + accessors) | **25.3 µs** | **363** |
+| std/json typed (`parseJson().to(FlatTypes)`) | 64.5 µs | 143 |
+| std/json direct (`parseJson` + tree access) | 44.2 µs | 208 |
 
-jsonx wins: roughly **1.7x faster than std/json direct** and **2.5x faster than
+jsonx wins: roughly **1.75x faster than std/json direct** and **2.55x faster than
 std/json typed** -- without the ergonomics tax of `to`, which forces `Option` on
 every omittable field (a missing key raises `KeyError`) and drops unknown keys,
 where jsonx keeps unmodelled items and forward compatibility via `extraFieldsOf`.
