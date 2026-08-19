@@ -122,6 +122,9 @@ contract materially clearer. Call out any such change in the handoff.
 
 - jsonx decoding skips unknown object fields by default with `ufSkip`. This is the normal production
   behavior and provides forward compatibility.
+- Match JSON directions to the protocol role: request-only schema types need a `writeJson` path,
+  response-only schema types need a `readJson` path, and only genuinely bidirectional types need
+  both.
 - Public parse helpers always use `ufSkip`. For fixture or schema validation, callers decode the
   public schema type directly with `fromJson(..., unknownFields = ufReject)`.
 - The selected policy must propagate through nested objects, sequences, options, tables, references,
