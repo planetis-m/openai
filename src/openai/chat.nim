@@ -323,11 +323,7 @@ proc outputText*(x: ChatResult; i = 0): string =
   of ChatAssistantContentKind.text:
     result = x.choices[i].message.content.text
   of ChatAssistantContentKind.parts:
-    var textLen = 0
-    for part in x.choices[i].message.content.parts:
-      textLen += part.text.len
-
-    result = newStringOfCap(textLen)
+    result = ""
     for part in x.choices[i].message.content.parts:
       result.add(part.text)
 

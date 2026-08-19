@@ -292,14 +292,7 @@ proc parseFirstTextJson*[T](x: ResponseResult; dst: out T): bool =
 proc outputText*(x: ResponseResult): string =
   ## Returns all output-text parts concatenated in response order,
   ## or an empty string when the response has no output text.
-  var textLen = 0
-  for item in x.output:
-    if item.`type` == message:
-      for part in item.messageOf().content:
-        if part.`type` == ResponseOutputPartType.output_text:
-          textLen += part.text.len
-
-  result = newStringOfCap(textLen)
+  result = ""
   for item in x.output:
     if item.`type` == message:
       for part in item.messageOf().content:
