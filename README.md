@@ -420,12 +420,12 @@ and parse the call arguments. It uses a realistic 9 KB response body
 
 | strategy | ns/op | MB/s |
 |---|---|---|
-| **jsonx typed** (`fromJson` + accessors) | **25.3 µs** | **363** |
-| std/json typed (`parseJson().to(FlatTypes)`) | 64.5 µs | 143 |
-| std/json direct (`parseJson` + tree access) | 44.2 µs | 208 |
+| **jsonx typed** (`fromJson` + accessors) | **16.1 µs** | **571** |
+| std/json typed (`parseJson().to(FlatTypes)`) | 65.3 µs | 141 |
+| std/json direct (`parseJson` + tree access) | 45.2 µs | 204 |
 
-For this end-to-end path, the OpenAI client is about **1.75x faster than direct
-std/json tree access** and **2.55x faster than std/json typed decoding**. You get
+For this end-to-end path, the OpenAI client is about **2.8x faster than direct
+std/json tree access** and **4.05x faster than std/json typed decoding**. You get
 lower parsing overhead while keeping the normal typed API: access the values you
 need directly, and retain newer API fields in `extraFieldsOf` instead of breaking
 older clients or silently losing that data. jsonx provides the underlying decoding.

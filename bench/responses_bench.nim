@@ -24,98 +24,11 @@ import std/[json, monotimes, options, strformat, times]
 import jsonx
 import openai/responses
 
+import responses_fixture
+
 {.passL: "-lcurl".}
 
 const WarmupIters = 3000
-
-const
-  PartCount = 10
-  PartTextSize = 350
-  SummaryCount = 4
-  SummarySize = 220
-  CallArgsJson = """
-  {"query":"invoice reconciliation anomaly for vendor ACME-0042 quarter 3",
-   "filters":{"min_amount":120.5,"currency":"EUR","statuses":["open","review"]},
-   "limit":25,"include_attachments":false}
-  """
-
-  ProseWords = ["analysis", "invoice", "vendor", "quarter", "reconciliation",
-    "ledger", "anomaly", "threshold", "policy", "exception", "audit",
-    "currency", "matching", "tolerance", "flagged", "reviewed", "posting",
-    "balance", "discrepancy", "clearing", "journal", "approval"]
-
-func prose(seed, size: int): string =
-  var i = seed
-  while result.len < size:
-    if result.len > 0:
-      result.add ' '
-    result.add ProseWords[i mod ProseWords.len]
-    inc i
-
-proc makeBody(): string =
-  let logprobs = %*[{"token": "reconc", "logprob": -0.4132, "bytes": [114, 101, 99]},
-                    {"token": "ilia", "logprob": -1.2071, "bytes": [105, 108]},
-                    {"token": "ation", "logprob": -0.0859, "bytes": [97, 116]}]
-  let citation = %*{"type": "url_citation",
-                    "url": "https://docs.example.com/policy/invoice-matching",
-                    "title": "Invoice matching policy v4",
-                    "start_index": 57, "end_index": 301}
-
-  var summary: seq[JsonNode]
-  for i in 1..SummaryCount:
-    summary.add %*{"type": "summary_text", "text": prose(i * 7, SummarySize)}
-
-  var parts: seq[JsonNode]
-  for i in 1..PartCount:
-    parts.add %*{"type": "output_text", "text": prose(i * 13, PartTextSize),
-                 "annotations": if i mod 4 == 0: %[citation] else: %[],
-                 "logprobs": logprobs, "future_part_field": newJNull()}
-
-  let root = %*{
-    "id": "resp_9f3a7c",
-    "object": "response",
-    "created_at": 1786200000.123,
-    "completed_at": 1786200014,
-    "background": false,
-    "status": "completed",
-    "error": newJNull(),
-    "incomplete_details": newJNull(),
-    "model": "gpt-5.6-luna",
-    "output": @[
-      %*{"id": "rs_1", "type": "reasoning", "status": "completed",
-         "summary": summary, "content": %[],
-         "encrypted_content": "enc_" & prose(3, 180)},
-      %*{"id": "msg_1", "type": "message", "status": "completed",
-         "role": "assistant", "content": parts},
-      %*{"id": "fc_1", "type": "function_call", "status": "completed",
-         "call_id": "call_58c1e0", "name": "search_invoices",
-         "arguments": CallArgsJson, "future_item_field": {}},
-      %*{"id": "ws_1", "type": "web_search_call", "status": "completed",
-         "action": {"type": "search",
-                    "query": "vendor ACME-0042 credit memo policy"},
-         "results": [
-           {"id": "src_1", "url": "https://erp.example.com/wiki/credit-memos",
-            "title": "Credit memo handling",
-            "snippet": "Credit memos require finance approval above 500 EUR."},
-           {"id": "src_2", "url": "https://erp.example.com/wiki/vendors",
-            "title": "Vendor records",
-            "snippet": "ACME-0042 is a preferred vendor with net-45 terms."}]}
-    ],
-    "previous_response_id": newJNull(),
-    "service_tier": "default",
-    "usage": {
-      "input_tokens": 3187,
-      "input_tokens_details": {"cached_tokens": 2048, "cache_write_tokens": 153},
-      "output_tokens": 742,
-      "output_tokens_details": {"reasoning_tokens": 388},
-      "total_tokens": 3929},
-    "metadata": {"batch": "august-run", "job": "42"},
-    "reasoning": {"effort": "high", "summary": "auto"},
-    "truncation": "disabled",
-    "user": newJNull(),
-    "future_top_field": {"x": [1, 2, 3]}
-  }
-  $root
 
 # --- jsonx side: package decode + the real openai/responses accessors ---------
 # (`firstText`, `firstCallArgs`, `inputTokens`, `cachedInputTokens`,
@@ -277,7 +190,7 @@ template consume(text, args: string; inputTokens, outputTokens, cachedTokens,
     reasoningTokens.int64 + totalTokens.int64
 
 proc main() =
-  let body = makeBody()
+  let body = makeResponseBody()
   echo "body: ", body.len, " bytes, output items: 4 (reasoning, message x",
     PartCount, " parts, function_call, web_search_call)"
 
@@ -300,7 +213,7 @@ proc main() =
     doAssert totalTokens(r) == direct.totalTokens
     doAssert direct.hasUsage
     doAssert r.output[3].`type` == ResponseOutputKind.web_search_call
-    doAssert r.output[3].extraFieldsOf().len > 0
+    doAssert ($r.output[3].extraFieldsOf()).len > 0
     doAssert std.output[3].`type` == "web_search_call"
     doAssert std.metadata["job"].getStr == "42"
     var argsA: CallArgs
