@@ -376,11 +376,7 @@ proc readJson*(dst: var ResponseOutput; p: var JsonParser; unknownFields: Unknow
       readJson(encryptedContent, p, unknownFields)
     else:
       appendRawField(extra, fieldName, p)
-
-    if p.tok == tkComma:
-      discard getTok(p)
-    elif p.tok != tkCurlyRi:
-      raiseParseErr(p, "',' or '}'")
+    expectObjectSeparator(p)
   eat(p, tkCurlyRi)
 
   case kind

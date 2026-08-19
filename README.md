@@ -413,10 +413,10 @@ proc requestWithRetry(client: Relay; cfg: OpenAIConfig;
 
 ## Performance
 
-This benchmark times the hottest Responses path: decode a full `POST /responses`
-body, then extract the first text, the first function call, the usage tokens, and
-parse the call's arguments. jsonx's typed decode vs the std/json alternatives on a
-realistic 9 KB body (`nim c -d:release -r bench/responses_bench.nim`):
+This benchmark measures the work your app commonly does after a `POST /responses`:
+decode a full response, read its first text and function call, inspect token usage,
+and parse the call arguments. It uses a realistic 9 KB response body
+(`nim c -d:release -r bench/responses_bench.nim`):
 
 | strategy | ns/op | MB/s |
 |---|---|---|
@@ -424,10 +424,11 @@ realistic 9 KB body (`nim c -d:release -r bench/responses_bench.nim`):
 | std/json typed (`parseJson().to(FlatTypes)`) | 64.5 µs | 143 |
 | std/json direct (`parseJson` + tree access) | 44.2 µs | 208 |
 
-jsonx wins: roughly **1.75x faster than std/json direct** and **2.55x faster than
-std/json typed** -- without the ergonomics tax of `to`, which forces `Option` on
-every omittable field (a missing key raises `KeyError`) and drops unknown keys,
-where jsonx keeps unmodelled items and forward compatibility via `extraFieldsOf`.
+For this end-to-end path, the OpenAI client is about **1.75x faster than direct
+std/json tree access** and **2.55x faster than std/json typed decoding**. You get
+lower parsing overhead while keeping the normal typed API: access the values you
+need directly, and retain newer API fields in `extraFieldsOf` instead of breaking
+older clients or silently losing that data. jsonx provides the underlying decoding.
 
 ## Run Examples
 

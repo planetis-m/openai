@@ -35,10 +35,7 @@ proc readJson*(dst: var OpenAIErrorResponse; p: var JsonParser;
         skipJson(p)
       else:
         raiseParseErr(p, "valid object field")
-    if p.tok == tkComma:
-      discard getTok(p)
-    elif p.tok != tkCurlyRi:
-      raiseParseErr(p, "comma or closing brace")
+    expectObjectSeparator(p)
   eat(p, tkCurlyRi)
   if not foundError:
     raiseParseErr(p, "error field")
