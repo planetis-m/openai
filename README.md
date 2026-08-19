@@ -411,6 +411,24 @@ proc requestWithRetry(client: Relay; cfg: OpenAIConfig;
   `fileListRequest`, `fileContentRequest`, `fileDeleteRequest`,
   `fileParse`, `fileListParse`, `fileDeletedParse`
 
+## Performance
+
+This benchmark times the hottest Responses path: decode a full `POST /responses`
+body, then extract the first text, the first function call, the usage tokens, and
+parse the call's arguments. jsonx's typed decode vs the std/json alternatives on a
+realistic 9 KB body (`nim c -d:release -r bench/responses_bench.nim`):
+
+| strategy | ns/op | MB/s |
+|---|---|---|
+| **jsonx typed** (`fromJson` + accessors) | **25.6 µs** | **359** |
+| std/json typed (`parseJson().to(FlatTypes)`) | 65.0 µs | 141 |
+| std/json direct (`parseJson` + tree access) | 44.4 µs | 207 |
+
+jsonx wins: roughly **1.7x faster than std/json direct** and **2.5x faster than
+std/json typed** -- without the ergonomics tax of `to`, which forces `Option` on
+every omittable field (a missing key raises `KeyError`) and drops unknown keys,
+where jsonx keeps unmodelled items and forward compatibility via `extraFieldsOf`.
+
 ## Run Examples
 
 `DEEPINFRA_API_KEY` is required. Export it (for example: `set -a; source .env; set +a`).

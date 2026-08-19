@@ -341,9 +341,9 @@ proc makeTypedResponseOutput(kind: ResponseOutputKind; id, status, role: sink st
 
 proc readJson*(dst: var ResponseOutput; p: var JsonParser; unknownFields: UnknownFieldPolicy) =
   var id, status, role, callId, name, arguments, encryptedContent: string
-  var kind: ResponseOutputKind
-  var content: seq[ResponseOutputPart]
-  var summary: seq[ResponseReasoningSummaryPart]
+  var kind: ResponseOutputKind = unknown
+  var content: seq[ResponseOutputPart] = @[]
+  var summary: seq[ResponseReasoningSummaryPart] = @[]
   var extra = ""
 
   eat(p, tkCurlyLe)
