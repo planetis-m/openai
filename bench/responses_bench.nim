@@ -7,9 +7,8 @@
 ##                    `openai/responses` accessors (`firstText`, `firstCallArgs`,
 ##                    `inputTokens`, ...). The full package is imported so we
 ##                    time the exact path a consumer runs, not a hand-rolled copy.
-##   std/json typed : `parseJson(body).to(MyFlatTypes)` into flat own types
-##                    (`type` fields as strings, `JsonNode` for open payloads,
-##                    `Option` for server-omittable fields)
+##   std/json typed : `parseJson(body).to(MyFlatTypes)` into flat own types.
+##                    It projects known fields; `to` drops unknown item fields.
 ##   std/json direct: `parseJson(body)` + direct tree access of needed fields only
 ##   std/json parse : tree construction alone (floor for any std/json strategy)
 ##
@@ -20,7 +19,7 @@
 ## (the package import pulls in relay's curl bindings, hence the -lcurl below;
 ##  it affects link time only, not the measured hot loop)
 
-import std/[json, options, strformat, strutils, times, monotimes]
+import std/[json, monotimes, options, strformat, times]
 
 import jsonx
 import openai/responses
@@ -34,7 +33,11 @@ const
   PartTextSize = 350
   SummaryCount = 4
   SummarySize = 220
-  CallArgsJson = """{"query":"invoice reconciliation anomaly for vendor ACME-0042 quarter 3","filters":{"min_amount":120.5,"currency":"EUR","statuses":["open","review"]},"limit":25,"include_attachments":false}"""
+  CallArgsJson = """
+  {"query":"invoice reconciliation anomaly for vendor ACME-0042 quarter 3",
+   "filters":{"min_amount":120.5,"currency":"EUR","statuses":["open","review"]},
+   "limit":25,"include_attachments":false}
+  """
 
   ProseWords = ["analysis", "invoice", "vendor", "quarter", "reconciliation",
     "ledger", "anomaly", "threshold", "policy", "exception", "audit",
@@ -125,65 +128,63 @@ proc makeBody(): string =
 
 type
   StdPart = object
-    `type`*: string
-    text*: string
-    refusal*: Option[string]
-    annotations*: JsonNode
-    logprobs*: JsonNode
+    `type`: string
+    text: string
+    refusal: Option[string]
+    annotations: JsonNode
+    logprobs: JsonNode
 
   StdSummaryPart = object
-    `type`*: string
-    text*: string
+    `type`: string
+    text: string
 
   StdItem = object
-    id*: string
-    status*: string
-    `type`*: string
-    role*: Option[string]
-    content*: Option[seq[StdPart]]
-    call_id*: Option[string]
-    name*: Option[string]
-    arguments*: Option[string]
-    summary*: Option[seq[StdSummaryPart]]
-    encrypted_content*: Option[string]
+    id: string
+    status: string
+    `type`: string
+    role: Option[string]
+    content: Option[seq[StdPart]]
+    arguments: Option[string]
+    summary: Option[seq[StdSummaryPart]]
+    encrypted_content: Option[string]
 
   StdError = object
-    code*: string
-    message*: string
+    code: string
+    message: string
 
   StdIncomplete = object
-    reason*: string
+    reason: string
 
   StdInputDetails = object
-    cached_tokens*: int
-    cache_write_tokens*: int
+    cached_tokens: int
+    cache_write_tokens: int
 
   StdOutputDetails = object
-    reasoning_tokens*: int
+    reasoning_tokens: int
 
   StdUsage = object
-    input_tokens*: int
-    output_tokens*: int
-    total_tokens*: int
-    input_tokens_details*: StdInputDetails
-    output_tokens_details*: StdOutputDetails
+    input_tokens: int
+    output_tokens: int
+    total_tokens: int
+    input_tokens_details: StdInputDetails
+    output_tokens_details: StdOutputDetails
 
   StdResult = object
-    id*: string
-    `object`*: string
-    created_at*: float
-    completed_at*: Option[int64]
-    background*: bool
-    status*: string
-    error*: Option[StdError]
-    incomplete_details*: Option[StdIncomplete]
-    model*: string
-    output*: seq[StdItem]
-    previous_response_id*: Option[string]
-    service_tier*: string
-    usage*: Option[StdUsage]
-    metadata*: JsonNode
-    reasoning*: JsonNode
+    id: string
+    `object`: string
+    created_at: float
+    completed_at: Option[int64]
+    background: bool
+    status: string
+    error: Option[StdError]
+    incomplete_details: Option[StdIncomplete]
+    model: string
+    output: seq[StdItem]
+    previous_response_id: Option[string]
+    service_tier: string
+    usage: Option[StdUsage]
+    metadata: JsonNode
+    reasoning: JsonNode
 
 proc stdFirstTextLocation(x: StdResult): tuple[outputIndex, partIndex: int] =
   for outputIndex in 0..<x.output.len:
@@ -199,21 +200,20 @@ proc stdFirstText(x: StdResult): lent string =
   let location = stdFirstTextLocation(x)
   result = x.output[location.outputIndex].content.get[location.partIndex].text
 
-proc stdFirstCall(x: StdResult): tuple[id, name, args: string] =
+proc stdFirstCallArgs(x: StdResult): lent string =
   for i in 0..<x.output.len:
     if x.output[i].`type` == "function_call":
-      return (x.output[i].call_id.get(""), x.output[i].name.get(""),
-        x.output[i].arguments.get(""))
+      if x.output[i].arguments.isSome:
+        return x.output[i].arguments.get
   raise newException(ValueError, "no function calls")
 
 # --- std/json side B: direct tree access of only the needed fields -----------
 
 type
   Direct = object
-    text*, callId*, callName*, callArgs*: string
-    inputTokens*, outputTokens*, cachedTokens*, reasoningTokens*,
-      totalTokens*: int
-    hasUsage*: bool
+    text, callArgs: string
+    inputTokens, outputTokens, cachedTokens, reasoningTokens, totalTokens: int
+    hasUsage: bool
 
 func strOrEmpty(n: JsonNode): string {.inline.} =
   if n != nil and n.kind == JString: n.str else: ""
@@ -239,9 +239,7 @@ proc extractDirect(body: string; dst: var Direct) =
               if text.len > 0:
                 dst.text = text
                 break
-      elif kind == "function_call" and dst.callId.len == 0:
-        dst.callId = strOrEmpty(item.getOrDefault("call_id"))
-        dst.callName = strOrEmpty(item.getOrDefault("name"))
+      elif kind == "function_call" and dst.callArgs.len == 0:
         dst.callArgs = strOrEmpty(item.getOrDefault("arguments"))
   let usage = root.getOrDefault("usage").objOrNull()
   if usage != nil:
@@ -260,15 +258,15 @@ proc extractDirect(body: string; dst: var Direct) =
 
 type
   CallFilters = object
-    min_amount*: float
-    currency*: string
-    statuses*: seq[string]
+    min_amount: float
+    currency: string
+    statuses: seq[string]
 
   CallArgs = object
-    query*: string
-    filters*: CallFilters
-    limit*: int
-    include_attachments*: bool
+    query: string
+    filters: CallFilters
+    limit: int
+    include_attachments: bool
 
 var checksum: int64
 
@@ -285,13 +283,14 @@ proc main() =
 
   block correctness:
     var r: ResponseResult
-    doAssert (r = fromJson(body, ResponseResult); r.id == "resp_9f3a7c")
+    r = fromJson(body, ResponseResult)
+    doAssert r.id == "resp_9f3a7c"
     let std = parseJson(body).to(StdResult)
     var direct: Direct
     extractDirect(body, direct)
     doAssert firstText(r) == stdFirstText(std)
     doAssert firstText(r) == direct.text
-    doAssert firstCallArgs(r) == stdFirstCall(std).args
+    doAssert firstCallArgs(r) == stdFirstCallArgs(std)
     doAssert firstCallArgs(r) == direct.callArgs
     doAssert inputTokens(r) == std.usage.get.input_tokens
     doAssert inputTokens(r) == direct.inputTokens
@@ -301,12 +300,13 @@ proc main() =
     doAssert totalTokens(r) == direct.totalTokens
     doAssert direct.hasUsage
     doAssert r.output[3].`type` == ResponseOutputKind.web_search_call
+    doAssert r.output[3].extraFieldsOf().len > 0
     doAssert std.output[3].`type` == "web_search_call"
     doAssert std.metadata["job"].getStr == "42"
     var argsA: CallArgs
     doAssert (parseFirstCallArgs(r, argsA) and
         argsA.query.len > 0 and argsA.limit == 25)
-    let argsB = parseJson(stdFirstCall(std).args).to(CallArgs)
+    let argsB = parseJson(stdFirstCallArgs(std)).to(CallArgs)
     doAssert argsA.query == argsB.query and argsA.limit == argsB.limit
     echo "parity checks: OK"
 
@@ -325,8 +325,7 @@ proc main() =
 
   proc stdTyped() =
     stdResult = parseJson(body).to(StdResult)
-    let call = stdFirstCall(stdResult)
-    consume(stdFirstText(stdResult), call.args,
+    consume(stdFirstText(stdResult), stdFirstCallArgs(stdResult),
       stdResult.usage.get.input_tokens, stdResult.usage.get.output_tokens,
       stdResult.usage.get.input_tokens_details.cached_tokens,
       stdResult.usage.get.output_tokens_details.reasoning_tokens,
@@ -348,7 +347,7 @@ proc main() =
     checksum += parsedArgs.limit.int64
 
   proc stdParseArgs() =
-    parsedArgs = parseJson(stdFirstCall(stdResult).args).to(CallArgs)
+    parsedArgs = parseJson(stdFirstCallArgs(stdResult)).to(CallArgs)
     checksum += parsedArgs.limit.int64
 
   proc measure(name: string; op: proc(); baseline: float = 0): float =
@@ -359,9 +358,9 @@ proc main() =
     let one = (getMonoTime() - t0).inNanoseconds.float
     let iters = max(1, int(0.4e9 / max(one, 1.0)))
     var best = 0'i64
-    for round in 1..3:
+    for _ in 1..3:
       let r0 = getMonoTime()
-      for i in 1..iters:
+      for _ in 1..iters:
         op()
       let dt = (getMonoTime() - r0).inNanoseconds
       if best == 0 or dt < best:
